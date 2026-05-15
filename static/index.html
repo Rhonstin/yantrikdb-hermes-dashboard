@@ -1,0 +1,200 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>YantrikDB Dashboard</title>
+  <link rel="icon" href="/static/assets/favicon.svg?v=yantrikdb-white-favicon-2" type="image/svg+xml">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/static/styles.css?v=threeviz-historyfix1" />
+</head>
+<body>
+  <div class="grain"></div>
+  <aside class="sidebar">
+    <div class="brand">
+      <button id="brandHome" class="brand-home" type="button" aria-label="Go to overview">
+        <span class="sigil"><img src="/static/assets/favicon.svg?v=yantrikdb-white-favicon-2" alt="" /></span>
+        <span class="brand-copy">
+          <span class="brand-title">YantrikDB</span>
+          <span class="brand-sub">Cognitive Memory Dashboard</span>
+        </span>
+      </button>
+      <button id="menuToggle" class="menu-toggle" aria-label="Open menu" aria-expanded="false">☰</button>
+    </div>
+    <nav id="nav">
+      <button class="nav-item active" data-view="overview">Overview</button>
+      <button class="nav-item" data-view="visualiser">Visualiser</button>
+      <button class="nav-item" data-view="memories">Memories</button>
+      <button class="nav-item" data-view="recall">Recall Debugger</button>
+      <button class="nav-item" data-view="conflicts">Contradictions</button>
+      <button class="nav-item" data-view="graph">Entity Graph</button>
+      <button class="nav-item" data-view="lifecycle">Decay & Triggers</button>
+      <button class="nav-item" data-view="ops">think() / Admin</button>
+    </nav>
+    <div class="side-card">
+      <div class="label">Namespace</div>
+      <select id="namespaceSelect"></select>
+      <div class="muted mini" id="dbPath">Loading DB…</div>
+    </div>
+    <div class="side-card">
+      <div class="label">Mode</div>
+      <div id="adminBadge" class="pill neutral">Read-only</div>
+      <input id="adminToken" class="token-input" placeholder="Admin token (optional)" type="password" />
+    </div>
+  </aside>
+
+  <main class="shell">
+    <header class="topbar">
+      <div>
+        <h1 id="pageTitle">Memory Operations</h1>
+      </div>
+      <div class="top-actions">
+        <button id="refreshBtn" class="btn secondary">Refresh</button>
+        <a id="exportLink" class="btn ghost" href="#">Export JSONL</a>
+      </div>
+    </header>
+
+    <section id="view-overview" class="view active">
+      <div class="grid stats" id="statsGrid"></div>
+      <div class="two-col">
+        <div class="panel">
+          <div class="panel-head"><h3>Memory composition</h3><span class="muted">domain/source/type</span></div>
+          <div id="composition"></div>
+        </div>
+        <div class="panel">
+          <div class="panel-head"><h3>Recent writes</h3><span class="muted">last 30 days</span></div>
+          <canvas id="recentChart" height="170"></canvas>
+        </div>
+      </div>
+      <div class="panel">
+        <div class="panel-head"><h3>Namespaces & profile boundaries</h3><span class="muted">detect accidental sharing</span></div>
+        <div id="namespaceTable" class="table-wrap"></div>
+      </div>
+    </section>
+
+    <section id="view-visualiser" class="view">
+      <div class="section-tabs visualiser-tabs" aria-label="Visualiser mode">
+        <button id="threeConstellationTab" data-three-mode="constellation" class="active">Constellation</button>
+        <button id="threeNeuralTab" data-three-mode="neural">Neural Map</button>
+      </div>
+      <div class="toolbar visualiser-toolbar">
+        <button id="threeRefresh" class="btn primary">Refresh visualiser</button>
+        <button id="threeReset" class="btn secondary">Reset view</button>
+        <button id="threePanMode" class="btn secondary">Pan mode</button>
+        <button id="threePause" class="btn secondary">Pause rotation</button>
+        <button id="threeFullscreen" class="btn secondary">Fullscreen</button>
+        <span id="threeHelp" class="muted">Drag to rotate · Pan mode/Shift-drag to pan · wheel/pinch to zoom.</span>
+      </div>
+      <div class="three-layout">
+        <div id="threeViewport" class="three-viewport glass" aria-label="Interactive 3D YantrikDB memory visualiser">
+          <button id="threeExitFullscreen" class="fullscreen-exit" aria-label="Exit fullscreen">×</button>
+          <div id="threeLabels" class="three-labels"></div>
+          <div id="threeLegend" class="constellation-legend three-legend"><span><i class="legend-dot entity"></i>Entity/topic</span><span><i class="legend-dot memory"></i>Memory</span><span><i class="legend-line"></i>Link</span></div>
+        </div>
+        <aside id="threeInspector" class="graph-inspector glass">
+          <div class="inspector-kicker">Constellation inspector</div>
+          <h3>Nothing selected</h3>
+          <p class="muted">Pick a star, memory, or link to inspect the underlying YantrikDB source.</p>
+        </aside>
+      </div>
+      <div id="threeClusters" class="cluster-row"></div>
+    </section>
+
+    <section id="view-memories" class="view">
+      <div class="toolbar">
+        <input id="memorySearch" placeholder="Search text…" />
+        <select id="statusFilter"><option value="active">active</option><option value="consolidated">consolidated</option><option value="tombstoned">tombstoned</option><option value="all">all</option></select>
+        <input id="domainFilter" placeholder="domain" />
+        <input id="sourceFilter" placeholder="source" />
+        <select id="sortFilter"><option value="created_at">created</option><option value="updated_at">updated</option><option value="last_access">last access</option><option value="importance">importance</option><option value="access_count">access count</option></select>
+        <button id="memoryApply" class="btn secondary">Apply</button>
+      </div>
+      <div class="split">
+        <div class="panel list-panel"><div id="memoryList" class="memory-list"></div><div id="memoryPager" class="pager"></div></div>
+        <div class="panel detail-panel"><div id="memoryDetail" class="empty">Select a memory to inspect metadata, entities, claims, and provenance.</div></div>
+      </div>
+    </section>
+
+    <section id="view-recall" class="view">
+      <div class="panel recall-panel">
+        <div class="panel-head"><h3>Recall Debugger</h3><span class="muted">skip_reinforce=true</span></div>
+        <textarea id="recallQuery" placeholder="Ask: what should this agent remember about YantrikDB dashboards?"></textarea>
+        <div class="toolbar compact">
+          <input id="recallDomain" placeholder="domain optional" />
+          <input id="recallSource" placeholder="source optional" />
+          <label><input id="recallConsolidated" type="checkbox" /> include consolidated</label>
+          <label><input id="recallGraph" type="checkbox" checked /> graph expansion</label>
+          <input id="recallTopK" type="number" min="1" max="50" value="10" />
+          <button id="runRecall" class="btn primary">Run recall</button>
+        </div>
+      </div>
+      <div id="recallResults" class="recall-results"></div>
+    </section>
+
+    <section id="view-conflicts" class="view">
+      <div class="toolbar">
+        <select id="conflictStatus"><option value="">any status</option><option value="open">open</option><option value="resolved">resolved</option><option value="dismissed">dismissed</option></select>
+        <button id="loadConflicts" class="btn secondary">Load conflicts</button>
+      </div>
+      <div class="split">
+        <div class="panel list-panel"><div id="conflictList" class="memory-list"></div></div>
+        <div class="panel detail-panel"><div id="conflictDetail" class="empty">Select a conflict to review claims and resolve with admin mode.</div></div>
+      </div>
+    </section>
+
+    <section id="view-graph" class="view">
+      <div class="panel helper-card">
+        <div class="panel-head"><h3>How to use Entity Graph</h3><span class="muted">relationship edges only</span></div>
+        <p>Search picks an entity. Open graph draws YantrikDB relationship edges for that entity and lists memories explicitly linked to it. Plain text memories do not automatically appear here unless YantrikDB has populated entity/edge rows. If this page is empty, use Recall Debugger for normal memory search.</p>
+      </div>
+      <div class="toolbar">
+        <input id="entitySearch" placeholder="Search entity…" />
+        <button id="loadEntities" class="btn secondary">Search</button>
+        <input id="graphEntity" placeholder="Entity graph root" />
+        <button id="loadGraph" class="btn primary">Open graph</button>
+      </div>
+      <div class="two-col wide-left">
+        <div class="panel"><div class="panel-head"><h3>Entity graph</h3><span id="graphMeta" class="muted"></span></div><svg id="graphSvg" viewBox="0 0 760 420"></svg></div>
+        <div class="panel"><div class="panel-head"><h3>Entities</h3><span class="muted">top mentions</span></div><div id="entityList" class="memory-list compact-list"></div></div>
+      </div>
+      <div class="panel"><div class="panel-head"><h3>Related memories</h3><span class="muted">entity evidence</span></div><div id="graphMemories" class="memory-list"></div></div>
+    </section>
+
+    <section id="view-lifecycle" class="view">
+      <div class="grid stats" id="lifecycleCards"></div>
+      <div class="two-col">
+      <div class="panel"><div class="panel-head"><h3>Decaying memories</h3><span class="muted">stale() candidates</span></div><div id="staleList" class="memory-list"></div></div>
+      <div class="panel"><div class="panel-head"><h3>Upcoming temporal memories</h3><span class="muted">upcoming() / due_at</span></div><div id="upcomingList" class="memory-list"></div></div>
+      </div>
+      <div class="two-col">
+        <div class="panel"><div class="panel-head"><h3>Patterns</h3><span class="muted">mined themes</span></div><div id="patternList" class="memory-list"></div></div>
+        <div class="panel"><div class="panel-head"><h3>Triggers</h3><span class="muted">proactive signals</span></div><div id="triggerList" class="memory-list"></div></div>
+      </div>
+    </section>
+
+    <section id="view-ops" class="view">
+      <div class="panel danger-zone">
+        <div class="panel-head"><h3>Admin actions</h3><span class="pill warn">requires token</span></div>
+        <p>Dashboard starts read-only. Set <code>YANTRIKDB_DASHBOARD_ADMIN_TOKEN</code>, restart, then enter token in the sidebar to mutate memory.</p>
+        <div class="ops-grid">
+          <button id="runThink" class="btn primary">Run think()</button>
+          <button id="refreshHealth" class="btn secondary">Refresh health</button>
+        </div>
+        <pre id="opsOutput"></pre>
+      </div>
+      <div class="panel"><div class="panel-head"><h3>Health payload</h3><span class="muted">config + plugin source</span></div><pre id="healthPayload"></pre></div>
+    </section>
+  </main>
+
+  <div id="memoryDrawer" class="drawer hidden" role="dialog" aria-modal="true" aria-label="Memory detail">
+    <button id="closeMemoryDrawer" aria-label="Close detail">×</button>
+    <div class="drawer-title">Memory detail</div>
+    <div id="memoryDrawerBody" class="drawer-body html-detail"></div>
+  </div>
+
+  <div id="toast" class="toast"></div>
+  <script src="/static/app.js?v=threeviz-historyfix1"></script>
+</body>
+</html>
