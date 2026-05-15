@@ -58,6 +58,31 @@ You can also use the helper script:
 scripts/start.sh
 ```
 
+## macOS launchd service
+
+For a persistent local dashboard that starts on login and restarts after crashes, install the LaunchAgent:
+
+```bash
+YANTRIKDB_DASHBOARD_PYTHON=/absolute/path/to/python \
+YANTRIKDB_DASHBOARD_HOST=0.0.0.0 \
+YANTRIKDB_DASHBOARD_PORT=8767 \
+scripts/install-launchd.sh
+```
+
+The installer writes:
+
+```text
+~/Library/LaunchAgents/io.yantrikdb.dashboard.local.plist
+```
+
+It uses `RunAtLoad` plus `KeepAlive` with `SuccessfulExit=false`, so launchd restarts the dashboard if it crashes. Logs go to `.run/launchd.out.log` and `.run/launchd.err.log` by default.
+
+Uninstall:
+
+```bash
+scripts/uninstall-launchd.sh
+```
+
 ## Configuration
 
 | Variable | Default | Purpose |
@@ -70,7 +95,9 @@ scripts/start.sh
 | `YANTRIKDB_EMBEDDING_DIM` | inferred from DB | Override embedding dimension |
 | `YANTRIKDB_EMBEDDER` | dimension-based default | Override embedder name |
 | `YANTRIKDB_DASHBOARD_ADMIN_TOKEN` | unset | Enables admin mutations when set |
-| `YANTRIKDB_DASHBOARD_PYTHON` | `python3` | Python binary used by `scripts/start.sh` |
+| `YANTRIKDB_DASHBOARD_PYTHON` | `python3` | Python binary used by `scripts/start.sh` and `scripts/install-launchd.sh` |
+| `YANTRIKDB_DASHBOARD_LOG_DIR` | `.run` | launchd stdout/stderr directory |
+| `YANTRIKDB_DASHBOARD_LAUNCHD_LABEL` | `io.yantrikdb.dashboard.local` | macOS LaunchAgent label |
 
 ## Admin endpoints
 

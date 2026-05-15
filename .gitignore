@@ -28,6 +28,7 @@ venv/
 # Logs / process files
 *.log
 *.pid
+.run/
 .DS_Store
 
 # Screenshots or private debug artifacts
