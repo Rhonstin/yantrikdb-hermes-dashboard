@@ -52,3 +52,13 @@ def test_static_assets_exist():
     assert (Path(dashboard.STATIC_DIR) / "app.js").exists()
     assert (Path(dashboard.STATIC_DIR) / "styles.css").exists()
     assert (Path(dashboard.STATIC_DIR) / "assets" / "favicon.svg").exists()
+
+
+def test_three_visualiser_css_has_bounded_viewport():
+    css = (Path(dashboard.STATIC_DIR) / "styles.css").read_text()
+    assert ".three-viewport" in css
+    assert "height:650px" in css
+    assert "min-height:650px" in css
+    assert ".three-viewport canvas" in css
+    assert "position:absolute" in css
+    assert "height:100%" in css

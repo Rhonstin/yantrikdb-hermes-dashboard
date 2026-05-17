@@ -161,11 +161,16 @@
   .cluster-row { @apply mb-3 flex flex-wrap gap-2; }
   .cluster-pill { @apply rounded-full border border-white/10 bg-white/[.05] px-3 py-1.5 text-xs font-bold text-zinc-300; }
   .constellation-wrap, .three-viewport {
-    @apply relative min-h-[620px] overflow-hidden rounded-[28px] border border-white/10 bg-[#05070d] shadow-panel;
+    @apply relative h-[650px] min-h-[650px] overflow-hidden rounded-[28px] border border-white/10 bg-[#05070d] shadow-panel;
     background: radial-gradient(circle at 50% 45%, rgba(233,69,96,.18), transparent 30%), radial-gradient(circle at 74% 15%, rgba(140,140,255,.13), transparent 28%), linear-gradient(180deg, rgba(5,7,13,.98), rgba(10,11,20,.95));
+    touch-action: none;
+    overscroll-behavior: contain;
+    user-select: none;
+    cursor: grab;
   }
-  .constellation-wrap[data-visualiser="neural"] { background: radial-gradient(circle at 48% 42%, rgba(34,130,111,.25), transparent 34%), radial-gradient(circle at 76% 20%, rgba(82,214,181,.12), transparent 24%), linear-gradient(180deg, rgba(5,9,15,.98), rgba(8,13,24,.94)); }
-  .constellation-layout, .three-layout { @apply grid grid-cols-1 gap-4 xl:grid-cols-[1fr_360px]; }
+  .constellation-wrap[data-visualiser="neural"], .three-viewport[data-three-mode="neural"] { background: radial-gradient(circle at 48% 42%, rgba(34,130,111,.25), transparent 34%), radial-gradient(circle at 76% 20%, rgba(82,214,181,.12), transparent 24%), linear-gradient(180deg, rgba(5,9,15,.98), rgba(8,13,24,.94)); }
+  .constellation-layout, .three-layout { @apply grid grid-cols-1 items-stretch gap-4 xl:grid-cols-[minmax(0,1fr)_360px]; }
+  .three-viewport canvas { @apply absolute inset-0 block h-full w-full; }
   .graph-inspector { @apply min-h-[420px] rounded-[28px] border border-white/10 bg-white/[.045] p-5 shadow-panel; }
   .inspector-kicker { @apply text-[11px] font-black uppercase tracking-[.16em] text-yan-orange; }
   .graph-inspector h3 { @apply mt-2 text-xl font-black text-white; }
@@ -185,7 +190,7 @@
   .three-fallback-card { @apply absolute left-1/2 top-1/2 w-[min(92%,420px)] -translate-x-1/2 -translate-y-1/2 rounded-3xl border border-white/10 bg-black/60 p-6 text-center shadow-panel backdrop-blur-xl; }
   .three-fallback-card h3 { @apply text-xl font-black text-white; }
 
-  #constellationCanvas { @apply h-full w-full; }
+  #constellationCanvas { @apply relative z-[1] block h-full w-full; touch-action: none; user-select: none; }
   #graphSvg { @apply h-[420px] w-full rounded-2xl border border-white/10 bg-black/20; }
   .graph-node { fill: rgba(233,69,96,.9); stroke: rgba(255,255,255,.85); stroke-width: 1.2; }
   .graph-node.memory { fill: rgba(140,140,255,.9); }
@@ -231,7 +236,7 @@
   .diag-row strong { @apply text-left; }
   .drawer-actions { @apply grid grid-cols-1; }
   .drawer-action { @apply w-full; }
-  .constellation-wrap, .three-viewport { @apply min-h-[430px] rounded-3xl; }
+  .constellation-wrap, .three-viewport { @apply h-[430px] min-h-[430px] rounded-3xl; }
   .constellation-legend, .three-legend { @apply left-3 right-3 bottom-3; }
 }
 
