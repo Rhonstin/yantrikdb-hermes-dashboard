@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>YantrikDB Dashboard</title>
   <link rel="icon" href="/static/assets/favicon.svg?v=yantrikdb-white-favicon-2" type="image/svg+xml">
-  <link rel="stylesheet" href="/static/styles.css?v=recall-mobile-wrap-2" />
+  <link rel="stylesheet" href="/static/styles.css?v=password-settings-2" />
 </head>
 <body>
   <div class="grain"></div>
@@ -48,10 +48,7 @@
       <div>
         <h1 id="pageTitle">Memory Operations</h1>
       </div>
-      <div class="top-actions">
-        <button id="refreshBtn" class="btn secondary">Refresh</button>
-        <a id="exportLink" class="btn ghost" href="#">Export JSONL</a>
-      </div>
+
     </header>
 
     <section id="view-overview" class="view active">
@@ -193,6 +190,19 @@
             <span><strong>Admin Mode</strong><small>Allow mutation actions like think(), resolve, and tombstone.</small></span>
             <input id="adminModeToggle" type="checkbox" />
           </label>
+          <div class="password-card">
+            <div><strong>Dashboard password</strong><small>Protect dashboard APIs and memory content when accessed from any device.</small></div>
+            <input id="dashboardPassword" type="password" placeholder="New password" autocomplete="new-password" />
+            <div class="settings-actions">
+              <button id="savePassword" class="btn primary">Set / change password</button>
+              <button id="disablePassword" class="btn secondary">Disable password</button>
+            </div>
+            <div id="passwordState" class="muted mini">Password disabled</div>
+          </div>
+          <div class="settings-actions">
+            <a id="settingsExportLink" class="btn ghost" href="#">Export memories JSONL</a>
+            <button id="logoutBtn" class="btn secondary">Log out</button>
+          </div>
           <div class="settings-note">For launch-time defaults, set <code>YANTRIKDB_DASHBOARD_ADMIN_MODE=true</code>. No admin token is needed.</div>
         </div>
       </div>
@@ -207,6 +217,15 @@
   </div>
 
   <div id="toast" class="toast"></div>
+  <div id="loginModal" class="modal hidden" role="dialog" aria-modal="true" aria-label="Dashboard login">
+    <div class="modal-card">
+      <div class="inspector-kicker">YantrikDB</div>
+      <h3>Enter dashboard password</h3>
+      <p class="muted">This dashboard is password protected.</p>
+      <input id="loginPassword" type="password" placeholder="Password" autocomplete="current-password" />
+      <div class="modal-actions"><button id="loginBtn" class="btn primary">Unlock</button></div>
+    </div>
+  </div>
   <div id="confirmModal" class="modal hidden" role="dialog" aria-modal="true" aria-label="Confirm action">
     <div class="modal-card">
       <div class="inspector-kicker">Confirm</div>
@@ -215,6 +234,6 @@
       <div class="modal-actions"><button id="confirmCancel" class="btn secondary">Cancel</button><button id="confirmOk" class="btn primary">Continue</button></div>
     </div>
   </div>
-  <script src="/static/app.js?v=recall-mobile-wrap-2"></script>
+  <script src="/static/app.js?v=password-settings-2"></script>
 </body>
 </html>

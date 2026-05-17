@@ -7,8 +7,11 @@ YANTRIKDB_DASHBOARD_ADMIN_MODE or the local Settings page.
 from __future__ import annotations
 
 import json
+import hashlib
+import hmac
 import os
 import re
+import secrets
 import sqlite3
 import time
 from collections import Counter
@@ -17,7 +20,7 @@ from typing import Any, Optional
 
 from fastapi import FastAPI, HTTPException, Query, Request
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import FileResponse, JSONResponse, StreamingResponse
+from fastapi.responses import FileResponse, JSONResponse, Response, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
@@ -133,14 +136,43 @@ def admin_mode_enabled() -> bool:
     return bool(ADMIN_MODE_ENV or load_dashboard_settings().get("admin_mode"))
 
 
-def is_local_request(request: Request) -> bool:
-    host = (request.client.host if request.client else "") or ""
-    return host in {"127.0.0.1", "::1", "localhost"} or host.startswith("127.")
-
-
 def require_admin(request: Request) -> None:
     if not admin_mode_enabled():
         raise HTTPException(403, "Admin mode is disabled. Enable it in Settings or set YANTRIKDB_DASHBOARD_ADMIN_MODE=true.")
+
+
+SESSION_COOKIE = "yantrikdb_dashboard_session"
+
+
+def password_enabled(settings: dict[str, Any] | None = None) -> bool:
+    settings = settings if settings is not None else load_dashboard_settings()
+    return bool(settings.get("password_hash") and settings.get("password_salt") and settings.get("session_secret"))
+
+
+def hash_password(password: str, salt_hex: str | None = None) -> tuple[str, str]:
+    salt = bytes.fromhex(salt_hex) if salt_hex else secrets.token_bytes(16)
+    digest = hashlib.pbkdf2_hmac("sha256", password.encode("utf-8"), salt, 210_000)
+    return salt.hex(), digest.hex()
+
+
+def verify_password(password: str, settings: dict[str, Any]) -> bool:
+    if not password_enabled(settings):
+        return False
+    _salt, digest = hash_password(password, str(settings["password_salt"]))
+    return hmac.compare_digest(digest, str(settings["password_hash"]))
+
+
+def session_value(settings: dict[str, Any]) -> str:
+    msg = str(settings.get("password_hash", "")).encode("utf-8")
+    secret = str(settings.get("session_secret", "")).encode("utf-8")
+    return hmac.new(secret, msg, hashlib.sha256).hexdigest()
+
+
+def is_authenticated(request: Request, settings: dict[str, Any] | None = None) -> bool:
+    settings = settings if settings is not None else load_dashboard_settings()
+    if not password_enabled(settings):
+        return True
+    return hmac.compare_digest(request.cookies.get(SESSION_COOKIE, ""), session_value(settings))
 
 
 def infer_embedding_dim() -> int:
@@ -210,8 +242,24 @@ class ThinkRequest(BaseModel):
     consolidation_limit: Optional[int] = None
 
 
+class LoginRequest(BaseModel):
+    password: str
+
+
 class SettingsRequest(BaseModel):
     admin_mode: bool
+    new_password: Optional[str] = None
+    disable_password: bool = False
+
+
+@app.middleware("http")
+async def password_gate(request: Request, call_next):
+    path = request.url.path
+    if path.startswith("/api/") and not path.startswith("/api/auth/"):
+        settings = load_dashboard_settings()
+        if password_enabled(settings) and not is_authenticated(request, settings):
+            return JSONResponse(status_code=401, content={"detail": "Dashboard password required"})
+    return await call_next(request)
 
 
 @app.get("/")
@@ -247,6 +295,7 @@ def health() -> dict[str, Any]:
         "default_namespace": DEFAULT_NAMESPACE,
         "admin_enabled": admin_mode_enabled(),
         "admin_mode_env": ADMIN_MODE_ENV,
+        "password_enabled": password_enabled(),
         "settings_path": str(SETTINGS_PATH),
         "yantrikdb_version": core_version,
         "embedder": preferred_embedder_for_dim(infer_embedding_dim()) or os.environ.get("YANTRIKDB_EMBEDDER") or "default",
@@ -257,12 +306,14 @@ def health() -> dict[str, Any]:
 
 
 @app.get("/api/settings")
-def get_settings() -> dict[str, Any]:
+def get_settings(request: Request) -> dict[str, Any]:
     stored = load_dashboard_settings()
     return {
         "admin_mode": admin_mode_enabled(),
         "admin_mode_env": ADMIN_MODE_ENV,
         "admin_mode_stored": bool(stored.get("admin_mode")),
+        "password_enabled": password_enabled(stored),
+        "authenticated": is_authenticated(request, stored),
         "settings_path": str(SETTINGS_PATH),
         "db_path": str(DB_PATH),
         "default_namespace": DEFAULT_NAMESPACE,
@@ -272,14 +323,52 @@ def get_settings() -> dict[str, Any]:
 
 
 @app.post("/api/settings")
-def update_settings(req: SettingsRequest, request: Request) -> dict[str, Any]:
-    if not is_local_request(request):
-        raise HTTPException(403, "Settings changes are only allowed from localhost.")
+def update_settings(req: SettingsRequest, request: Request) -> Response:
     data = load_dashboard_settings()
     data["admin_mode"] = bool(req.admin_mode)
+    clear_cookie = False
+    if req.disable_password:
+        data.pop("password_hash", None)
+        data.pop("password_salt", None)
+        data.pop("session_secret", None)
+        clear_cookie = True
+    elif req.new_password is not None and req.new_password.strip():
+        salt, digest = hash_password(req.new_password.strip())
+        data["password_salt"] = salt
+        data["password_hash"] = digest
+        data["session_secret"] = secrets.token_hex(32)
+        clear_cookie = True
     data["updated_at"] = now()
     save_dashboard_settings(data)
-    return get_settings()
+    response = JSONResponse(get_settings(request))
+    if clear_cookie:
+        response.delete_cookie(SESSION_COOKIE)
+    return response
+
+
+@app.get("/api/auth/status")
+def auth_status(request: Request) -> dict[str, Any]:
+    settings = load_dashboard_settings()
+    return {"password_required": password_enabled(settings), "authenticated": is_authenticated(request, settings)}
+
+
+@app.post("/api/auth/login")
+def auth_login(req: LoginRequest) -> Response:
+    settings = load_dashboard_settings()
+    if not password_enabled(settings):
+        return JSONResponse({"ok": True, "password_required": False})
+    if not verify_password(req.password, settings):
+        raise HTTPException(403, "Invalid dashboard password")
+    response = JSONResponse({"ok": True, "password_required": True, "authenticated": True})
+    response.set_cookie(SESSION_COOKIE, session_value(settings), httponly=True, samesite="lax", max_age=60 * 60 * 24 * 30)
+    return response
+
+
+@app.post("/api/auth/logout")
+def auth_logout() -> Response:
+    response = JSONResponse({"ok": True})
+    response.delete_cookie(SESSION_COOKIE)
+    return response
 
 
 @app.get("/api/stats")

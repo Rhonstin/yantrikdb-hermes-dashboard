@@ -13,6 +13,7 @@ async function api(path, opts={}){
   const res = await fetch(path, {...opts, headers});
   const txt = await res.text();
   let data; try{ data=txt?JSON.parse(txt):{} }catch{ data={raw:txt}; }
+  if(res.status===401){ showLogin(); throw new Error(data.detail || 'Dashboard password required'); }
   if(!res.ok) throw new Error(data.detail || data.error || res.statusText);
   return data;
 }
@@ -83,7 +84,7 @@ async function init(){
   document.addEventListener('keydown',(e)=>{ if(e.key==='Escape'){ document.body.classList.remove('menu-open'); $('#menuToggle')?.setAttribute('aria-expanded','false'); closeMemoryDetail({silent:true}); } });
   $('#closeMemoryDrawer')?.addEventListener('click',()=>closeMemoryDetail());
   $('#memoryDrawer')?.addEventListener('click',(e)=>{ if(e.target.id==='memoryDrawer') closeMemoryDetail(); });
-  $('#refreshBtn').onclick=()=>refreshAll(); $('#namespaceSelect').onchange=()=>refreshAll();
+  $('#namespaceSelect').onchange=()=>refreshAll();
   $('#memoryApply').onclick=()=>{state.memoryOffset=0; writeRoute('memories',{replace:true}); loadMemories();}; $('#runRecall').onclick=runRecall; $('#loadConflicts').onclick=loadConflicts;
   $('#threeRefresh')?.addEventListener('click',()=>loadVisualiser(true));
   $('#threeReset')?.addEventListener('click',()=>resetVisualiser());
@@ -93,8 +94,13 @@ async function init(){
   $('#threeExitFullscreen')?.addEventListener('click',()=>document.exitFullscreen?.());
   $$('.visualiser-tabs button[data-three-mode]').forEach(b=>b.onclick=()=>setVisualiserMode(b.dataset.threeMode));
   $('#loadEntities').onclick=loadEntities; $('#loadGraph').onclick=()=>loadGraph($('#graphEntity').value||$('#entitySearch').value);
-  $('#runThink').onclick=runThink; $('#refreshHealth').onclick=loadHealthPanel; $('#adminModeToggle')?.addEventListener('change',saveSettings);
-  await refreshAll();
+  $('#runThink').onclick=runThink; $('#refreshHealth').onclick=loadHealthPanel; $('#adminModeToggle')?.addEventListener('change',()=>saveSettings());
+  $('#savePassword')?.addEventListener('click',()=>saveSettings({password:true}));
+  $('#disablePassword')?.addEventListener('click',()=>saveSettings({disablePassword:true}));
+  $('#logoutBtn')?.addEventListener('click',logout);
+  $('#loginBtn')?.addEventListener('click',login);
+  $('#loginPassword')?.addEventListener('keydown',(e)=>{ if(e.key==='Enter') login(); });
+  try{ await refreshAll(); }catch(e){ toast(e.message); return; }
   const initialView = new URLSearchParams(location.search).get('view') || 'overview';
   setView(initialView,{replace:true,fromUrl:true});
   const initialMemory = new URLSearchParams(location.search).get('memory');
@@ -111,7 +117,7 @@ async function refreshAll(){
   if(![...sel.options].some(o=>o.value===prev)) sel.insertAdjacentHTML('afterbegin',`<option value="${esc(prev)}">${esc(prev)}</option>`);
   sel.value=prev;
   $('#dbPath').textContent=state.health.db_path;
-  $('#exportLink').href=`/api/export/memories.jsonl?namespace=${encodeURIComponent(ns())}&status=active`;
+  if($('#settingsExportLink')) $('#settingsExportLink').href=`/api/export/memories.jsonl?namespace=${encodeURIComponent(ns())}&status=active`;
   updateAdminBadge();
   await loadStats();
   if(state.view==='memories') await loadMemories();
@@ -119,23 +125,49 @@ async function refreshAll(){
 }
 
 function settingsRows(s){
-  const rows=[['Admin mode', s.admin_mode ? 'Enabled' : 'Read-only'],['Launch env', s.admin_mode_env ? 'YANTRIKDB_DASHBOARD_ADMIN_MODE=true' : 'not set'],['Settings file', s.settings_path],['Database', s.db_path],['Default namespace', s.default_namespace],['Embedder', `${s.embedder} (${s.embedding_dim}d)`]];
+  const rows=[['Admin mode', s.admin_mode ? 'Enabled' : 'Read-only'],['Password', s.password_enabled ? 'Enabled' : 'Disabled'],['Launch env', s.admin_mode_env ? 'YANTRIKDB_DASHBOARD_ADMIN_MODE=true' : 'not set'],['Settings file', s.settings_path],['Database', s.db_path],['Default namespace', s.default_namespace],['Embedder', `${s.embedder} (${s.embedding_dim}d)`]];
   return rows.map(([k,v])=>`<div class="diag-row"><span>${esc(k)}</span><strong>${esc(v)}</strong></div>`).join('');
 }
 async function loadSettings(){
   state.settings=await api('/api/settings');
   const toggle=$('#adminModeToggle'); if(toggle) toggle.checked=!!state.settings.admin_mode;
+  const passwordState=$('#passwordState'); if(passwordState) passwordState.textContent=state.settings.password_enabled?'Password enabled. Changing or disabling it clears saved browser sessions.':'Password disabled.';
+  if($('#settingsExportLink')) $('#settingsExportLink').href=`/api/export/memories.jsonl?namespace=${encodeURIComponent(ns())}&status=active`;
   $('#settingsRuntime').innerHTML=settingsRows(state.settings);
   updateAdminBadge();
 }
-async function saveSettings(){
+async function saveSettings(opts={}){
   const enabled=!!$('#adminModeToggle')?.checked;
+  const payload={admin_mode:enabled};
+  if(opts.password){
+    const pw=$('#dashboardPassword')?.value||'';
+    if(!pw.trim()){ toast('Enter a new password first'); return; }
+    payload.new_password=pw;
+  }
+  if(opts.disablePassword) payload.disable_password=true;
   try{
-    state.settings=await api('/api/settings',{method:'POST',body:JSON.stringify({admin_mode:enabled})});
+    state.settings=await api('/api/settings',{method:'POST',body:JSON.stringify(payload)});
+    if($('#dashboardPassword')) $('#dashboardPassword').value='';
+    if(opts.password) { showLogin(); toast('Password changed — log in again'); return; }
     state.health=await api('/api/health');
     await loadSettings();
-    toast(enabled?'Admin Mode enabled':'Admin Mode disabled');
+    if(opts.disablePassword) toast('Password disabled');
+    else toast(enabled?'Admin Mode enabled':'Admin Mode disabled');
   }catch(e){toast(e.message); await loadSettings();}
+}
+
+function showLogin(){ $('#loginModal')?.classList.remove('hidden'); setTimeout(()=>$('#loginPassword')?.focus(),50); }
+function hideLogin(){ $('#loginModal')?.classList.add('hidden'); if($('#loginPassword')) $('#loginPassword').value=''; }
+async function login(){
+  try{
+    await api('/api/auth/login',{method:'POST',body:JSON.stringify({password:$('#loginPassword')?.value||''})});
+    hideLogin(); toast('Unlocked'); await refreshAll();
+    const initialView = new URLSearchParams(location.search).get('view') || state.view || 'overview';
+    setView(initialView,{replace:true,fromUrl:true});
+  }catch(e){ toast(e.message); }
+}
+async function logout(){
+  try{ await api('/api/auth/logout',{method:'POST',body:'{}'}); showLogin(); toast('Logged out'); }catch(e){ toast(e.message); }
 }
 
 async function loadStats(){
@@ -154,7 +186,19 @@ async function loadStats(){
 function humanBytes(b){ if(!b) return '0 B'; const u=['B','KB','MB','GB']; let i=0; while(b>1024&&i<u.length-1){b/=1024;i++;} return `${b.toFixed(i?1:0)} ${u[i]}`; }
 function metric(label,value){return `<div class="metric"><div class="metric-label">${esc(label)}</div><div class="metric-value">${esc(fmt(value))}</div></div>`}
 function compositionBlock(title, arr){ const max=Math.max(1,...(arr||[]).map(x=>x.count)); return `<div class="detail-section"><div class="label">${title}</div>${(arr||[]).slice(0,8).map(x=>`<div class="bar-row"><span>${esc(x.domain||x.source||x.type||'—')}</span><div class="bar"><span style="width:${(x.count/max)*100}%"></span></div><b>${fmt(x.count)}</b></div>`).join('')}</div>`; }
-function drawRecent(data){ const c=$('#recentChart'), ctx=c.getContext('2d'), w=c.width=c.clientWidth*devicePixelRatio, h=c.height=170*devicePixelRatio; ctx.clearRect(0,0,w,h); const max=Math.max(1,...data.map(d=>d.count)); const pad=24*devicePixelRatio, bw=(w-pad*2)/Math.max(1,data.length); data.forEach((d,i)=>{const x=pad+i*bw+2, bh=(h-pad*2)*(d.count/max); const y=h-pad-bh; const g=ctx.createLinearGradient(0,y,0,h-pad); g.addColorStop(0,'#e94560'); g.addColorStop(1,'#ffa500'); ctx.fillStyle=g; ctx.fillRect(x,y,Math.max(2,bw-4),bh);}); }
+function drawRecent(data){
+  const c=$('#recentChart'); if(!c) return;
+  const rect=c.getBoundingClientRect();
+  const cssW=Math.max(1, Math.floor(rect.width || c.parentElement?.clientWidth || 320));
+  const cssH=170;
+  const dpr=Math.min(devicePixelRatio||1,2);
+  c.style.width='100%'; c.style.height=`${cssH}px`;
+  c.width=Math.floor(cssW*dpr); c.height=Math.floor(cssH*dpr);
+  const ctx=c.getContext('2d'); ctx.setTransform(dpr,0,0,dpr,0,0); ctx.clearRect(0,0,cssW,cssH);
+  const max=Math.max(1,...data.map(d=>d.count));
+  const pad=18, gap=Math.max(3, Math.min(8, cssW/80)), bw=(cssW-pad*2)/Math.max(1,data.length);
+  data.forEach((d,i)=>{const x=pad+i*bw+gap/2, bh=(cssH-pad*2)*(d.count/max); const y=cssH-pad-bh; const g=ctx.createLinearGradient(0,y,0,cssH-pad); g.addColorStop(0,'#e94560'); g.addColorStop(1,'#ffa500'); ctx.fillStyle=g; ctx.fillRect(x,y,Math.max(2,bw-gap),bh);});
+}
 
 function visualiserColors(){ return viz.mode==='neural' ? {bg:'#050915',core:'rgba(24,130,112,.30)',mid:'rgba(9,14,28,.96)',star:'#66e8c6',memory:'#ff9b6a',text:'#f7f8ff',edge:'rgba(102,232,198,.36)',memoryEdge:'rgba(255,155,106,.44)'} : {bg:'#050711',core:'rgba(233,69,96,.18)',mid:'rgba(9,10,18,.96)',star:'#ffd6dd',memory:'#ffa500',text:'#f7f8ff',edge:'rgba(255,214,221,.30)',memoryEdge:'rgba(255,165,0,.42)'}; }
 function setVisualiserMode(mode){ viz.mode=mode||'constellation'; $$('.visualiser-tabs button').forEach(b=>b.classList.toggle('active',b.dataset.vizMode===viz.mode)); document.querySelector('.constellation-wrap')?.setAttribute('data-visualiser',viz.mode); if(viz.data) buildVisualiserScene(viz.data); }

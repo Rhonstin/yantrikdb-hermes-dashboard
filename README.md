@@ -8,6 +8,7 @@ It is designed for private agent-memory operations: recall debugging, contradict
 
 - Local-only FastAPI app with a static HTML/CSS/JS frontend
 - Read-only by default; mutation endpoints require Admin Mode from Settings or `YANTRIKDB_DASHBOARD_ADMIN_MODE=true`
+- Optional dashboard password protects API access and is managed from Settings
 - Memory browser with search, filters, card grid, and detail drawer
 - Recall debugger with optional domain/source filters
 - Contradiction, entity graph, stale/upcoming, trigger, and pattern views
@@ -17,9 +18,9 @@ It is designed for private agent-memory operations: recall debugging, contradict
 
 ## Safety model
 
-The dashboard can expose sensitive memory content to whoever can reach the web UI. Bind it to `127.0.0.1` unless you intentionally want LAN access.
+The dashboard can expose sensitive memory content to whoever can reach the web UI. Bind it to `127.0.0.1` unless you intentionally want LAN access. If you expose it on LAN, set a dashboard password from Settings.
 
-Admin/mutating endpoints are disabled unless Admin Mode is enabled. Toggle it in the local Settings page, or set `YANTRIKDB_DASHBOARD_ADMIN_MODE=true` before launch.
+Admin/mutating endpoints are disabled unless Admin Mode is enabled. Toggle it in Settings, or set `YANTRIKDB_DASHBOARD_ADMIN_MODE=true` before launch. Admin Mode is not localhost-only; use the dashboard password when exposing the service beyond localhost.
 
 ## Install
 
@@ -119,7 +120,7 @@ Admin operations include conflict resolution, `think()`, and forgetting memories
 export YANTRIKDB_DASHBOARD_ADMIN_MODE=true
 ```
 
-You can also toggle Admin Mode from the dashboard Settings page. Settings changes are accepted only from localhost.
+You can also toggle Admin Mode from the dashboard Settings page. Settings also contains JSONL export and the dashboard password controls. Changing or disabling the password clears the saved browser session cookie, so the next visit must authenticate again.
 
 ## Development
 

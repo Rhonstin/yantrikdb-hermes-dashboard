@@ -62,3 +62,34 @@ def test_three_visualiser_css_has_bounded_viewport():
     assert ".three-viewport canvas" in css
     assert "position:absolute" in css
     assert "height:100%" in css
+
+
+def test_password_gate_login_and_cookie_rotation(tmp_path, monkeypatch):
+    monkeypatch.setattr(dashboard, "SETTINGS_PATH", tmp_path / "settings.json")
+    monkeypatch.setattr(dashboard, "ADMIN_MODE_ENV", False)
+    client = TestClient(dashboard.app)
+
+    response = client.post("/api/settings", json={"admin_mode": False, "new_password": "old-pass"})
+    assert response.status_code == 200
+    assert "yantrikdb_dashboard_session" in response.headers.get("set-cookie", "")
+    assert client.get("/api/health").status_code == 401
+
+    assert client.post("/api/auth/login", json={"password": "old-pass"}).status_code == 200
+    assert client.get("/api/settings").status_code == 200
+
+    response = client.post("/api/settings", json={"admin_mode": False, "new_password": "new-pass"})
+    assert response.status_code == 200
+    assert client.get("/api/settings").status_code == 401
+    assert client.post("/api/auth/login", json={"password": "old-pass"}).status_code == 403
+    assert client.post("/api/auth/login", json={"password": "new-pass"}).status_code == 200
+
+
+def test_disabling_password_clears_cookie_and_opens_api(tmp_path, monkeypatch):
+    monkeypatch.setattr(dashboard, "SETTINGS_PATH", tmp_path / "settings.json")
+    client = TestClient(dashboard.app)
+    assert client.post("/api/settings", json={"admin_mode": False, "new_password": "pass"}).status_code == 200
+    assert client.post("/api/auth/login", json={"password": "pass"}).status_code == 200
+    response = client.post("/api/settings", json={"admin_mode": False, "disable_password": True})
+    assert response.status_code == 200
+    assert "yantrikdb_dashboard_session" in response.headers.get("set-cookie", "")
+    assert client.get("/api/settings").status_code == 200
