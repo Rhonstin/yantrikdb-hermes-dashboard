@@ -31,6 +31,9 @@ venv/
 .run/
 .DS_Store
 
+# Node / frontend build
+node_modules/
+
 # Screenshots or private debug artifacts
 *.png
 *.jpg

@@ -1,0 +1,243 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --bg: #07070a;
+    --bg2: #0f0f18;
+    --panel: rgba(17, 17, 27, .72);
+    --panel2: rgba(23, 23, 36, .86);
+    --line: rgba(255,255,255,.10);
+    --line-hot: rgba(233,69,96,.32);
+    --text: #fff7f9;
+    --muted: #b8b8c6;
+    --faint: #7d7d8c;
+    --pink: #ffd6dd;
+    --hot: #e94560;
+    --orange: #ffa500;
+    --green: #7bd88f;
+    --blue: #8c8cff;
+  }
+
+  * { box-sizing: border-box; }
+  html, body { min-height: 100%; }
+  body {
+    @apply m-0 overflow-hidden bg-yan-radial text-[15px] antialiased font-sans text-zinc-300;
+    overflow-x: hidden;
+  }
+  button, input, select, textarea { font: inherit; }
+  button:disabled { @apply cursor-not-allowed opacity-45; }
+  code, pre { @apply font-mono; }
+  ::selection { background: rgba(233,69,96,.34); color: #fff; }
+  ::-webkit-scrollbar { width: 10px; height: 10px; }
+  ::-webkit-scrollbar-thumb { background: rgba(255,255,255,.14); border-radius: 999px; border: 2px solid rgba(7,7,10,.95); }
+  ::-webkit-scrollbar-track { background: rgba(255,255,255,.03); }
+}
+
+@layer components {
+  .grain {
+    @apply pointer-events-none fixed inset-0 opacity-[.10];
+    background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.85' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='.46'/%3E%3C/svg%3E");
+  }
+
+  .sidebar {
+    @apply fixed left-0 top-0 bottom-0 z-40 flex w-[300px] flex-col gap-5 border-r border-white/10 bg-black/70 px-5 py-6 shadow-panel backdrop-blur-2xl;
+  }
+  .brand { @apply flex items-center gap-3; }
+  .brand-home { @apply flex min-w-0 items-center gap-3 rounded-2xl border-0 bg-transparent p-0 text-left text-inherit outline-none transition hover:scale-[1.01]; }
+  .brand-home:focus-visible { @apply ring-2 ring-yan-hot/50 ring-offset-2 ring-offset-black; }
+  .sigil { @apply grid h-11 w-11 shrink-0 place-items-center overflow-hidden rounded-2xl bg-gradient-to-br from-yan-hot to-[#45131c] shadow-glow; }
+  .sigil img { @apply block h-7 w-7; }
+  .brand-copy { @apply grid min-w-0 gap-0.5; }
+  .brand-title { @apply block truncate text-[23px] font-extrabold leading-none tracking-[-.055em] text-white; }
+  .brand-sub { @apply block truncate text-xs font-medium text-zinc-500; }
+  .menu-toggle { @apply ml-auto hidden h-11 w-11 shrink-0 items-center justify-center rounded-2xl border border-white/10 bg-white/[.04] text-2xl font-black leading-none text-yan-pink shadow-lg; }
+
+  nav { @apply grid gap-1.5; }
+  .nav-item { @apply rounded-xl border border-transparent bg-transparent px-3 py-2.5 text-left text-sm font-semibold text-zinc-400 transition duration-150 hover:border-white/10 hover:bg-white/[.055] hover:text-white; }
+  .nav-item.active { @apply border-yan-hot/35 bg-gradient-to-r from-yan-hot/20 to-yan-orange/10 text-white shadow-glow; }
+
+  .side-card { @apply rounded-2xl border border-white/10 bg-white/[.045] p-3 shadow-lg backdrop-blur-xl; }
+  .label { @apply mb-2 text-[10px] font-extrabold uppercase tracking-[.18em] text-zinc-500; }
+  .mini { @apply mt-2 text-[11px] leading-4; }
+  .muted { @apply text-zinc-400; }
+  select, input, textarea { @apply w-full rounded-xl border border-white/10 bg-black/35 px-3 py-2 text-sm text-white outline-none transition placeholder:text-zinc-600 focus:border-yan-hot/60 focus:ring-2 focus:ring-yan-hot/20; }
+  .token-input { @apply mt-2; }
+
+  .shell { @apply ml-[300px] h-screen overflow-y-auto px-7 py-6; overflow-x: hidden; }
+  .topbar { @apply mb-6 flex flex-wrap items-center justify-between gap-4; }
+  .topbar h1 { @apply m-0 text-4xl font-black tracking-[-.06em] text-white md:text-5xl; }
+  .top-actions { @apply flex flex-wrap items-center gap-2; }
+
+  .btn, button.btn, a.btn { @apply inline-flex min-h-10 min-w-0 items-center justify-center gap-2 rounded-xl border border-white/10 px-4 py-2 text-sm font-bold text-white no-underline transition hover:-translate-y-0.5 hover:border-white/20 hover:bg-white/[.07] active:translate-y-0; }
+  .btn.primary, .primary { @apply border-yan-hot/45 bg-yan-hot/20 text-yan-pink shadow-glow; }
+  .btn.secondary, .secondary { @apply bg-white/[.055] text-zinc-100; }
+  .btn.ghost, .ghost { @apply border-transparent bg-transparent text-zinc-400 hover:text-white; }
+  .btn.warn, .warn { @apply border-yan-orange/40 bg-yan-orange/10 text-yan-orange; }
+  .tiny { @apply min-h-8 rounded-lg px-3 py-1 text-xs; }
+
+  .view { display: none; }
+  .view.active { @apply block; }
+  .panel, .glass, .hero-card, .recall-panel, .helper-card, .detail, .danger-zone {
+    @apply rounded-3xl border border-white/10 bg-[rgba(17,17,27,.70)] p-5 shadow-panel backdrop-blur-2xl;
+  }
+  .panel-head { @apply mb-4 flex flex-wrap items-start justify-between gap-3; }
+  .panel-head h3 { @apply m-0 text-lg font-extrabold tracking-[-.025em] text-white; }
+  .two-col, .split { @apply grid grid-cols-1 gap-5 lg:grid-cols-2; }
+  .two-col.wide-left { @apply lg:grid-cols-[1.45fr_.9fr]; }
+  .ops-grid { @apply grid grid-cols-1 gap-4 lg:grid-cols-2; }
+  .stats { @apply mb-5 grid gap-4; grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  @screen lg { .stats { grid-template-columns: repeat(4, minmax(0, 1fr)); } }
+  .stat-card, .metric { @apply min-w-0 rounded-2xl border border-white/10 bg-gradient-to-br from-white/[.075] to-white/[.025] p-4 shadow-lg; }
+  .stat-label, .metric-label { @apply text-[10px] font-extrabold uppercase tracking-[.16em] text-zinc-500; }
+  .stat-value, .metric-value { @apply mt-2 break-words text-3xl font-black tracking-[-.05em] text-white; }
+
+  .toolbar { @apply mb-4 flex flex-wrap items-center gap-2 rounded-2xl border border-white/10 bg-black/25 p-3; }
+  .toolbar.compact { @apply mb-0; }
+  .toolbar input, .toolbar select { @apply min-w-[180px] flex-1; }
+  .toolbar button { @apply shrink-0; }
+
+  .pill { @apply inline-flex items-center rounded-full border border-white/10 bg-white/[.055] px-2.5 py-1 text-[11px] font-bold text-zinc-300; }
+  .pill.hot, .hot { @apply border-yan-hot/35 bg-yan-hot/15 text-yan-pink; }
+  .pill.good, .good { @apply border-yan-green/35 bg-yan-green/10 text-yan-green; }
+  .pill.neutral, .neutral { @apply border-white/10 bg-white/[.05] text-zinc-300; }
+
+  .table-wrap { @apply overflow-hidden rounded-2xl border border-white/10; }
+  table { @apply w-full border-collapse text-sm; }
+  th { @apply bg-white/[.055] px-4 py-3 text-left text-[11px] font-extrabold uppercase tracking-[.14em] text-zinc-500; }
+  td { @apply border-t border-white/10 px-4 py-3 text-zinc-300; }
+  td code { @apply text-yan-pink; }
+
+  .bar-row { @apply grid grid-cols-[140px_1fr_52px] items-center gap-3 py-2 text-sm; }
+  .bar-row span:first-child { @apply truncate text-zinc-300; }
+  .bar { @apply h-2 overflow-hidden rounded-full bg-white/[.07]; }
+  .bar span { @apply block h-full rounded-full bg-gradient-to-r from-yan-hot to-yan-orange; }
+  .bar-row b { @apply text-right text-xs text-zinc-500; }
+
+  .section-tabs { @apply mb-4 inline-flex rounded-2xl border border-white/10 bg-black/25 p-1; }
+  .section-tabs button { @apply rounded-xl border-0 bg-transparent px-4 py-2 text-sm font-bold text-zinc-400 transition hover:text-white; }
+  .section-tabs button.active { @apply bg-white/[.09] text-white shadow; }
+
+  .memory-list, .compact-list { @apply grid gap-3; }
+  .memory-item, .recall-card {
+    @apply cursor-pointer rounded-2xl border border-white/10 bg-white/[.045] p-4 transition hover:-translate-y-0.5 hover:border-yan-hot/35 hover:bg-white/[.07] hover:shadow-glow;
+  }
+  .memory-title { @apply text-sm font-extrabold text-white; }
+  .memory-text { @apply mt-2 line-clamp-3 text-sm leading-6 text-zinc-300; }
+  .meta-row { @apply mt-3 flex flex-wrap gap-2; }
+  .empty { @apply rounded-2xl border border-dashed border-white/10 bg-white/[.025] p-6 text-center text-zinc-500; }
+  .helpful-empty strong { @apply block text-white; }
+  .pager { @apply mt-4 flex items-center justify-between gap-3 text-sm text-zinc-400; }
+  .list-panel, .detail-panel { @apply min-h-[420px]; }
+
+  .drawer.hidden { display: none; }
+  .drawer {
+    @apply fixed bottom-4 right-4 top-4 z-[90] w-[520px] max-w-[calc(100vw-2rem)] overflow-y-auto rounded-[28px] border border-white/10 bg-[#0b0b10]/95 p-5 shadow-[0_34px_110px_rgba(0,0,0,.70)] backdrop-blur-2xl;
+  }
+  .drawer:before { content:""; @apply pointer-events-none absolute left-6 right-6 top-0 h-px bg-gradient-to-r from-transparent via-yan-hot/70 to-transparent; }
+  .drawer #closeMemoryDrawer, .drawer-close { @apply absolute right-4 top-4 grid h-10 w-10 place-items-center rounded-2xl border border-white/10 bg-white/[.05] text-2xl font-black text-white transition hover:border-yan-hot/40 hover:bg-yan-hot/15 hover:text-yan-pink; }
+  .drawer-title { @apply mr-12 text-[11px] font-black uppercase tracking-[.18em] text-yan-orange; }
+  .drawer-body { @apply mt-6 text-white; }
+  .memory-detail-kicker { @apply text-[11px] font-black uppercase tracking-[.16em] text-yan-orange; }
+  .memory-detail-title { @apply mt-2 text-2xl font-black tracking-[-.04em] text-white; }
+  .detail-content { @apply mt-4 whitespace-pre-wrap rounded-2xl border border-white/10 bg-black/25 p-4 text-[15px] leading-7 text-zinc-100; }
+  .drawer-actions { @apply my-4 flex flex-wrap gap-2; }
+  .drawer-action { @apply inline-flex min-h-9 items-center justify-center rounded-xl border border-white/10 bg-white/[.055] px-3 text-xs font-extrabold text-zinc-200 transition hover:border-white/20 hover:bg-white/[.08]; }
+  .drawer-action.primary { @apply border-yan-hot/40 bg-yan-hot/15 text-yan-pink; }
+  .drawer-action.warn { @apply border-yan-orange/40 bg-yan-orange/10 text-yan-orange; }
+  .diag-grid { @apply mt-4 grid gap-2; }
+  .diag-row { @apply grid grid-cols-[130px_1fr] gap-3 rounded-xl border border-white/10 bg-white/[.035] px-3 py-2 text-sm; }
+  .diag-row span { @apply text-zinc-500; }
+  .diag-row strong { @apply break-words text-right text-zinc-100; }
+  .diag-link { @apply text-yan-pink underline-offset-4 hover:underline; }
+  .detail-section { @apply mt-4; }
+  .detail-section pre, .drawer pre { @apply max-h-[360px] overflow-auto whitespace-pre-wrap rounded-2xl border border-white/10 bg-black/40 p-4 text-xs leading-6 text-blue-100; }
+
+  .toast { @apply fixed bottom-5 left-1/2 z-[120] hidden -translate-x-1/2 rounded-2xl border border-white/10 bg-black/85 px-4 py-3 text-sm font-bold text-white shadow-panel backdrop-blur-xl; }
+  .toast.show { @apply block; }
+
+  .visualiser-toolbar { @apply mb-4; }
+  .cluster-row { @apply mb-3 flex flex-wrap gap-2; }
+  .cluster-pill { @apply rounded-full border border-white/10 bg-white/[.05] px-3 py-1.5 text-xs font-bold text-zinc-300; }
+  .constellation-wrap, .three-viewport {
+    @apply relative min-h-[620px] overflow-hidden rounded-[28px] border border-white/10 bg-[#05070d] shadow-panel;
+    background: radial-gradient(circle at 50% 45%, rgba(233,69,96,.18), transparent 30%), radial-gradient(circle at 74% 15%, rgba(140,140,255,.13), transparent 28%), linear-gradient(180deg, rgba(5,7,13,.98), rgba(10,11,20,.95));
+  }
+  .constellation-wrap[data-visualiser="neural"] { background: radial-gradient(circle at 48% 42%, rgba(34,130,111,.25), transparent 34%), radial-gradient(circle at 76% 20%, rgba(82,214,181,.12), transparent 24%), linear-gradient(180deg, rgba(5,9,15,.98), rgba(8,13,24,.94)); }
+  .constellation-layout, .three-layout { @apply grid grid-cols-1 gap-4 xl:grid-cols-[1fr_360px]; }
+  .graph-inspector { @apply min-h-[420px] rounded-[28px] border border-white/10 bg-white/[.045] p-5 shadow-panel; }
+  .inspector-kicker { @apply text-[11px] font-black uppercase tracking-[.16em] text-yan-orange; }
+  .graph-inspector h3 { @apply mt-2 text-xl font-black text-white; }
+  .inspector-actions { @apply mt-4 flex flex-wrap gap-2; }
+  .constellation-legend, .three-legend { @apply absolute bottom-4 left-4 z-10 flex flex-wrap gap-3 rounded-2xl border border-white/10 bg-black/45 px-3 py-2 text-xs font-bold text-zinc-300 backdrop-blur-xl; }
+  .legend-dot { @apply inline-block h-2.5 w-2.5 rounded-full bg-yan-hot align-middle; }
+  .legend-dot.entity { @apply bg-yan-orange; }
+  .legend-dot.memory { @apply bg-yan-blue; }
+  .legend-line { @apply inline-block h-px w-6 bg-gradient-to-r from-yan-hot to-yan-blue align-middle; }
+  .three-labels { @apply pointer-events-none absolute inset-0 z-20; }
+  .three-label { @apply absolute rounded-full border border-white/10 bg-black/45 px-2 py-1 text-[11px] font-bold text-white shadow backdrop-blur-md; }
+  .three-label.memory { @apply text-yan-pink; }
+  .three-aura-layer { @apply pointer-events-none absolute inset-0; }
+  .three-aura-oval { @apply absolute h-28 w-56 rounded-[999px] border border-yan-hot/10 bg-yan-hot/[.035] blur-[1px]; }
+  .fullscreen-exit { display: none; }
+  .three-viewport:fullscreen .fullscreen-exit { @apply absolute right-4 top-4 z-30 inline-flex; }
+  .three-fallback-card { @apply absolute left-1/2 top-1/2 w-[min(92%,420px)] -translate-x-1/2 -translate-y-1/2 rounded-3xl border border-white/10 bg-black/60 p-6 text-center shadow-panel backdrop-blur-xl; }
+  .three-fallback-card h3 { @apply text-xl font-black text-white; }
+
+  #constellationCanvas { @apply h-full w-full; }
+  #graphSvg { @apply h-[420px] w-full rounded-2xl border border-white/10 bg-black/20; }
+  .graph-node { fill: rgba(233,69,96,.9); stroke: rgba(255,255,255,.85); stroke-width: 1.2; }
+  .graph-node.memory { fill: rgba(140,140,255,.9); }
+  .graph-edge { stroke: rgba(255,255,255,.22); stroke-width: 1.2; }
+  .graph-label { fill: rgba(255,255,255,.76); font: 700 12px ui-sans-serif, system-ui; }
+  .graph-empty-label { fill: rgba(255,255,255,.88); font-size: 16px; }
+  .graph-empty-sub { fill: rgba(255,255,255,.48); font-size: 12px; }
+
+  .recall-results { @apply grid gap-3; }
+  .recall-score { @apply text-xs font-black text-yan-green; }
+  .html-detail { @apply max-w-none text-zinc-200; }
+  .html-detail p { @apply my-3 leading-7; }
+  .html-detail h1, .html-detail h2, .html-detail h3 { @apply mt-5 font-black text-white; }
+  .html-detail pre { @apply rounded-2xl border border-white/10 bg-black/40 p-4 text-xs leading-6 text-blue-100; }
+}
+
+@layer utilities {
+  .break-anywhere { overflow-wrap: anywhere; }
+}
+
+@media (max-width: 1200px) {
+  body { overflow: auto; }
+  .sidebar { @apply sticky top-0 z-50 w-full max-w-none flex-row flex-wrap items-center gap-3 border-b border-r-0 px-4 py-3; }
+  .brand { @apply flex-1; }
+  .menu-toggle { @apply flex; }
+  .sidebar nav { display: none; @apply absolute left-3 right-3 top-[68px] z-[80] rounded-3xl border border-white/10 bg-[#0b0b11]/95 p-3 shadow-panel backdrop-blur-2xl; }
+  body.menu-open .sidebar nav { @apply grid; }
+  .side-card { display: none; }
+  .shell { @apply ml-0 h-auto overflow-visible px-4 py-5; }
+}
+
+@media (max-width: 760px) {
+  .topbar h1 { @apply text-3xl; }
+  .top-actions { @apply grid w-full gap-2; grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .top-actions .btn { @apply w-full truncate px-3; }
+  .stats { @apply gap-3; grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .panel, .glass, .hero-card, .recall-panel, .helper-card, .detail, .danger-zone { @apply rounded-2xl p-4; }
+  .toolbar { @apply grid grid-cols-1; }
+  .toolbar input, .toolbar select, .toolbar button { @apply w-full min-w-0; }
+  .bar-row { @apply grid-cols-[92px_1fr_42px] text-xs; }
+  .drawer { @apply left-3 right-3 top-20 bottom-3 w-auto max-w-none rounded-3xl p-4; }
+  .diag-row { @apply grid-cols-1; }
+  .diag-row strong { @apply text-left; }
+  .drawer-actions { @apply grid grid-cols-1; }
+  .drawer-action { @apply w-full; }
+  .constellation-wrap, .three-viewport { @apply min-h-[430px] rounded-3xl; }
+  .constellation-legend, .three-legend { @apply left-3 right-3 bottom-3; }
+}
+
+@media (max-width: 430px) {
+  .brand-title { @apply text-[21px]; }
+  .brand-sub { @apply max-w-[230px]; }
+  .shell { @apply px-3; }
+  .top-actions { @apply grid-cols-1; }
+}

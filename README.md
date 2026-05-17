@@ -58,6 +58,17 @@ You can also use the helper script:
 scripts/start.sh
 ```
 
+## Frontend styling
+
+The dashboard uses a local Tailwind build, not the Tailwind CDN.
+
+```bash
+npm install
+npm run build:css
+```
+
+Source styles live in `src/styles.css`; the compiled artifact is served from `static/styles.css` so the FastAPI/launchd runtime stays a simple static app.
+
 ## macOS launchd service
 
 For a persistent local dashboard that starts on login and restarts after crashes, install the LaunchAgent:
