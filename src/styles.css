@@ -62,7 +62,9 @@
   .label { @apply mb-2 text-[10px] font-extrabold uppercase tracking-[.18em] text-zinc-500; }
   .mini { @apply mt-2 text-[11px] leading-4; }
   .muted { @apply text-zinc-400; }
-  select, input, textarea { @apply w-full rounded-xl border border-white/10 bg-black/35 px-3 py-2 text-sm text-white outline-none transition placeholder:text-zinc-600 focus:border-yan-hot/60 focus:ring-2 focus:ring-yan-hot/20; }
+  select, input, textarea { @apply w-full min-w-0 rounded-xl border border-white/10 bg-black/35 px-3 py-2 text-sm text-white outline-none transition placeholder:text-zinc-600 focus:border-yan-hot/60 focus:ring-2 focus:ring-yan-hot/20; }
+  input[type="checkbox"] { @apply h-4 w-4 min-w-4 shrink-0 accent-yan-hot; }
+  label { @apply min-w-0; }
   .token-input { @apply mt-2; }
 
   .shell { @apply ml-[300px] h-screen overflow-y-auto px-7 py-6; overflow-x: hidden; }
@@ -93,9 +95,9 @@
   .stat-label, .metric-label { @apply text-[10px] font-extrabold uppercase tracking-[.16em] text-zinc-500; }
   .stat-value, .metric-value { @apply mt-2 break-words text-3xl font-black tracking-[-.05em] text-white; }
 
-  .toolbar { @apply mb-4 flex flex-wrap items-center gap-2 rounded-2xl border border-white/10 bg-black/25 p-3; }
+  .toolbar { @apply mb-4 flex min-w-0 flex-wrap items-center gap-2 rounded-2xl border border-white/10 bg-black/25 p-3; }
   .toolbar.compact { @apply mb-0; }
-  .toolbar input, .toolbar select { @apply min-w-[180px] flex-1; }
+  .toolbar input:not([type="checkbox"]), .toolbar select { @apply min-w-[180px] flex-1; }
   .toolbar button { @apply shrink-0; }
 
   .pill { @apply inline-flex items-center rounded-full border border-white/10 bg-white/[.055] px-2.5 py-1 text-[11px] font-bold text-zinc-300; }
@@ -119,13 +121,15 @@
   .section-tabs button { @apply rounded-xl border-0 bg-transparent px-4 py-2 text-sm font-bold text-zinc-400 transition hover:text-white; }
   .section-tabs button.active { @apply bg-white/[.09] text-white shadow; }
 
-  .memory-list, .compact-list { @apply grid gap-3; }
+  .memory-list, .compact-list { @apply grid min-w-0 gap-3; }
   .memory-item, .recall-card {
-    @apply cursor-pointer rounded-2xl border border-white/10 bg-white/[.045] p-4 transition hover:-translate-y-0.5 hover:border-yan-hot/35 hover:bg-white/[.07] hover:shadow-glow;
+    @apply min-w-0 cursor-pointer overflow-hidden rounded-2xl border border-white/10 bg-white/[.045] p-4 transition hover:-translate-y-0.5 hover:border-yan-hot/35 hover:bg-white/[.07] hover:shadow-glow;
   }
   .memory-title { @apply text-sm font-extrabold text-white; }
-  .memory-text { @apply mt-2 line-clamp-3 text-sm leading-6 text-zinc-300; }
-  .meta-row { @apply mt-3 flex flex-wrap gap-2; }
+  .memory-text { @apply mt-2 line-clamp-3 break-words text-sm leading-6 text-zinc-300; }
+  .recall-card p { @apply break-words leading-7; overflow-wrap: anywhere; }
+  .meta-row { @apply mt-3 flex min-w-0 flex-wrap gap-2; }
+  .meta-row .pill { @apply max-w-full break-words; overflow-wrap: anywhere; }
   .empty { @apply rounded-2xl border border-dashed border-white/10 bg-white/[.025] p-6 text-center text-zinc-500; }
   .helpful-empty strong { @apply block text-white; }
   .pager { @apply mt-4 flex items-center justify-between gap-3 text-sm text-zinc-400; }
@@ -241,7 +245,8 @@
   .stats { @apply gap-3; grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .panel, .glass, .hero-card, .recall-panel, .helper-card, .detail, .danger-zone { @apply rounded-2xl p-4; }
   .toolbar { @apply grid grid-cols-1; }
-  .toolbar input, .toolbar select, .toolbar button { @apply w-full min-w-0; }
+  .toolbar input:not([type="checkbox"]), .toolbar select, .toolbar button { @apply w-full min-w-0; }
+  .toolbar input[type="checkbox"] { @apply h-4 w-4 min-w-4 flex-none; }
   .section-tabs { @apply grid w-full grid-cols-2; }
   .section-tabs button { @apply truncate px-3; }
   table { @apply min-w-full; }
