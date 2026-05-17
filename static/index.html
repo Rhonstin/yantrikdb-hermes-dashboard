@@ -28,7 +28,8 @@
       <button class="nav-item" data-view="conflicts">Contradictions</button>
       <button class="nav-item" data-view="graph">Entity Graph</button>
       <button class="nav-item" data-view="lifecycle">Decay & Triggers</button>
-      <button class="nav-item" data-view="ops">think() / Admin</button>
+      <button class="nav-item" data-view="ops">think()</button>
+      <button class="nav-item" data-view="settings">Settings</button>
     </nav>
     <div class="side-card">
       <div class="label">Namespace</div>
@@ -38,7 +39,7 @@
     <div class="side-card">
       <div class="label">Mode</div>
       <div id="adminBadge" class="pill neutral">Read-only</div>
-      <input id="adminToken" class="token-input" placeholder="Admin token (optional)" type="password" />
+      <div class="muted mini">Toggle writes from Settings.</div>
     </div>
   </aside>
 
@@ -173,8 +174,8 @@
 
     <section id="view-ops" class="view">
       <div class="panel danger-zone">
-        <div class="panel-head"><h3>Admin actions</h3><span class="pill warn">requires token</span></div>
-        <p>Dashboard starts read-only. Set <code>YANTRIKDB_DASHBOARD_ADMIN_TOKEN</code>, restart, then enter token in the sidebar to mutate memory.</p>
+        <div class="panel-head"><h3>Cognition actions</h3><span id="opsAdminState" class="pill neutral">Read-only</span></div>
+        <p>Dashboard starts read-only. Enable Admin Mode in Settings before running mutation actions.</p>
         <div class="ops-grid">
           <button id="runThink" class="btn primary">Run think()</button>
           <button id="refreshHealth" class="btn secondary">Refresh health</button>
@@ -182,6 +183,20 @@
         <pre id="opsOutput"></pre>
       </div>
       <div class="panel"><div class="panel-head"><h3>Health payload</h3><span class="muted">config + plugin source</span></div><pre id="healthPayload"></pre></div>
+    </section>
+
+    <section id="view-settings" class="view">
+      <div class="panel settings-panel">
+        <div class="panel-head"><h3>Settings</h3><span class="muted">local dashboard controls</span></div>
+        <div class="settings-grid">
+          <label class="switch-row">
+            <span><strong>Admin Mode</strong><small>Allow mutation actions like think(), resolve, and tombstone.</small></span>
+            <input id="adminModeToggle" type="checkbox" />
+          </label>
+          <div class="settings-note">For launch-time defaults, set <code>YANTRIKDB_DASHBOARD_ADMIN_MODE=true</code>. No admin token is needed.</div>
+        </div>
+      </div>
+      <div class="panel"><div class="panel-head"><h3>Runtime</h3><span class="muted">paths + model info</span></div><div id="settingsRuntime" class="diag-grid"></div></div>
     </section>
   </main>
 
@@ -192,6 +207,14 @@
   </div>
 
   <div id="toast" class="toast"></div>
+  <div id="confirmModal" class="modal hidden" role="dialog" aria-modal="true" aria-label="Confirm action">
+    <div class="modal-card">
+      <div class="inspector-kicker">Confirm</div>
+      <h3 id="confirmTitle">Confirm action</h3>
+      <p id="confirmMessage" class="muted"></p>
+      <div class="modal-actions"><button id="confirmCancel" class="btn secondary">Cancel</button><button id="confirmOk" class="btn primary">Continue</button></div>
+    </div>
+  </div>
   <script src="/static/app.js?v=threeviz-historyfix1"></script>
 </body>
 </html>

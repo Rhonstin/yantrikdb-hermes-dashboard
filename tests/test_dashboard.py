@@ -14,24 +14,24 @@ def test_index_serves_static_html():
     assert "brandHome" in response.text
 
 
-def test_admin_requires_token_when_disabled(monkeypatch):
-    monkeypatch.setattr(dashboard, "ADMIN_TOKEN", "")
+def test_admin_requires_admin_mode_when_disabled(monkeypatch):
+    monkeypatch.setattr(dashboard, "ADMIN_MODE_ENV", False)
+    monkeypatch.setattr(dashboard, "load_dashboard_settings", lambda: {})
     with pytest.raises(dashboard.HTTPException) as exc:
         dashboard.require_admin(None)
     assert exc.value.status_code == 403
-    assert "disabled" in exc.value.detail
+    assert "Admin mode is disabled" in exc.value.detail
 
 
-def test_admin_rejects_wrong_token(monkeypatch):
-    monkeypatch.setattr(dashboard, "ADMIN_TOKEN", "expected")
-    with pytest.raises(dashboard.HTTPException) as exc:
-        dashboard.require_admin("wrong")
-    assert exc.value.status_code == 403
+def test_admin_accepts_env_admin_mode(monkeypatch):
+    monkeypatch.setattr(dashboard, "ADMIN_MODE_ENV", True)
+    dashboard.require_admin(None)
 
 
-def test_admin_accepts_matching_token(monkeypatch):
-    monkeypatch.setattr(dashboard, "ADMIN_TOKEN", "expected")
-    dashboard.require_admin("expected")
+def test_admin_accepts_stored_admin_mode(monkeypatch):
+    monkeypatch.setattr(dashboard, "ADMIN_MODE_ENV", False)
+    monkeypatch.setattr(dashboard, "load_dashboard_settings", lambda: {"admin_mode": True})
+    dashboard.require_admin(None)
 
 
 def test_infer_embedding_dim_from_sqlite_blob(tmp_path, monkeypatch):

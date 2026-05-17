@@ -28,7 +28,7 @@
   }
   button, input, select, textarea { font: inherit; }
   button:disabled { @apply cursor-not-allowed opacity-45; }
-  code, pre { @apply font-mono; }
+  code, pre { @apply max-w-full break-words font-mono; }
   ::selection { background: rgba(233,69,96,.34); color: #fff; }
   ::-webkit-scrollbar { width: 10px; height: 10px; }
   ::-webkit-scrollbar-thumb { background: rgba(255,255,255,.14); border-radius: 999px; border: 2px solid rgba(7,7,10,.95); }
@@ -78,13 +78,13 @@
   .tiny { @apply min-h-8 rounded-lg px-3 py-1 text-xs; }
 
   .view { display: none; }
-  .view.active { @apply block; }
+  .view.active { @apply grid gap-5; }
   .panel, .glass, .hero-card, .recall-panel, .helper-card, .detail, .danger-zone {
-    @apply rounded-3xl border border-white/10 bg-[rgba(17,17,27,.70)] p-5 shadow-panel backdrop-blur-2xl;
+    @apply min-w-0 rounded-3xl border border-white/10 bg-[rgba(17,17,27,.70)] p-5 shadow-panel backdrop-blur-2xl;
   }
   .panel-head { @apply mb-4 flex flex-wrap items-start justify-between gap-3; }
   .panel-head h3 { @apply m-0 text-lg font-extrabold tracking-[-.025em] text-white; }
-  .two-col, .split { @apply grid grid-cols-1 gap-5 lg:grid-cols-2; }
+  .two-col, .split { @apply grid min-w-0 grid-cols-1 gap-5 lg:grid-cols-2; }
   .two-col.wide-left { @apply lg:grid-cols-[1.45fr_.9fr]; }
   .ops-grid { @apply grid grid-cols-1 gap-4 lg:grid-cols-2; }
   .stats { @apply mb-5 grid gap-4; grid-template-columns: repeat(2, minmax(0, 1fr)); }
@@ -103,11 +103,11 @@
   .pill.good, .good { @apply border-yan-green/35 bg-yan-green/10 text-yan-green; }
   .pill.neutral, .neutral { @apply border-white/10 bg-white/[.05] text-zinc-300; }
 
-  .table-wrap { @apply overflow-hidden rounded-2xl border border-white/10; }
-  table { @apply w-full border-collapse text-sm; }
+  .table-wrap { @apply max-w-full overflow-x-auto rounded-2xl border border-white/10; }
+  table { @apply w-full min-w-[520px] border-collapse text-sm; }
   th { @apply bg-white/[.055] px-4 py-3 text-left text-[11px] font-extrabold uppercase tracking-[.14em] text-zinc-500; }
   td { @apply border-t border-white/10 px-4 py-3 text-zinc-300; }
-  td code { @apply text-yan-pink; }
+  td code { @apply break-anywhere text-yan-pink; }
 
   .bar-row { @apply grid grid-cols-[140px_1fr_52px] items-center gap-3 py-2 text-sm; }
   .bar-row span:first-child { @apply truncate text-zinc-300; }
@@ -152,10 +152,22 @@
   .diag-row strong { @apply break-words text-right text-zinc-100; }
   .diag-link { @apply text-yan-pink underline-offset-4 hover:underline; }
   .detail-section { @apply mt-4; }
-  .detail-section pre, .drawer pre { @apply max-h-[360px] overflow-auto whitespace-pre-wrap rounded-2xl border border-white/10 bg-black/40 p-4 text-xs leading-6 text-blue-100; }
+  .detail-section pre, .drawer pre, .panel pre { @apply max-w-full max-h-[360px] overflow-auto whitespace-pre-wrap break-words rounded-2xl border border-white/10 bg-black/40 p-4 text-xs leading-6 text-blue-100; }
 
   .toast { @apply fixed bottom-5 left-1/2 z-[120] hidden -translate-x-1/2 rounded-2xl border border-white/10 bg-black/85 px-4 py-3 text-sm font-bold text-white shadow-panel backdrop-blur-xl; }
   .toast.show { @apply block; }
+  .modal.hidden { display: none; }
+  .modal { @apply fixed inset-0 z-[130] grid place-items-center bg-black/70 p-4 backdrop-blur-md; }
+  .modal-card { @apply w-[min(92vw,460px)] rounded-3xl border border-white/10 bg-[#101018] p-5 shadow-panel; }
+  .modal-card h3 { @apply mt-2 text-xl font-black text-white; }
+  .modal-actions { @apply mt-5 flex justify-end gap-2; }
+
+  .settings-grid { @apply grid gap-4; }
+  .switch-row { @apply flex flex-wrap items-center justify-between gap-4 rounded-2xl border border-white/10 bg-white/[.04] p-4; }
+  .switch-row strong { @apply block text-white; }
+  .switch-row small { @apply mt-1 block text-sm text-zinc-400; }
+  .switch-row input[type="checkbox"] { @apply h-7 w-12 accent-yan-hot; }
+  .settings-note { @apply rounded-2xl border border-white/10 bg-black/25 p-4 text-sm leading-6 text-zinc-300; }
 
   .visualiser-toolbar { @apply mb-4; }
   .cluster-row { @apply mb-3 flex flex-wrap gap-2; }
@@ -230,6 +242,10 @@
   .panel, .glass, .hero-card, .recall-panel, .helper-card, .detail, .danger-zone { @apply rounded-2xl p-4; }
   .toolbar { @apply grid grid-cols-1; }
   .toolbar input, .toolbar select, .toolbar button { @apply w-full min-w-0; }
+  .section-tabs { @apply grid w-full grid-cols-2; }
+  .section-tabs button { @apply truncate px-3; }
+  table { @apply min-w-full; }
+  .panel pre, .detail-section pre { @apply text-[11px]; }
   .bar-row { @apply grid-cols-[92px_1fr_42px] text-xs; }
   .drawer { @apply left-3 right-3 top-20 bottom-3 w-auto max-w-none rounded-3xl p-4; }
   .diag-row { @apply grid-cols-1; }
@@ -238,6 +254,7 @@
   .drawer-action { @apply w-full; }
   .constellation-wrap, .three-viewport { @apply h-[430px] min-h-[430px] rounded-3xl; }
   .constellation-legend, .three-legend { @apply left-3 right-3 bottom-3; }
+  .three-label { max-width: 120px; transform: translate(-50%,-50%); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 }
 
 @media (max-width: 430px) {

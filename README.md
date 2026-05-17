@@ -7,7 +7,7 @@ It is designed for private agent-memory operations: recall debugging, contradict
 ## Highlights
 
 - Local-only FastAPI app with a static HTML/CSS/JS frontend
-- Read-only by default; mutation endpoints require an explicit admin token
+- Read-only by default; mutation endpoints require Admin Mode from Settings or `YANTRIKDB_DASHBOARD_ADMIN_MODE=true`
 - Memory browser with search, filters, card grid, and detail drawer
 - Recall debugger with optional domain/source filters
 - Contradiction, entity graph, stale/upcoming, trigger, and pattern views
@@ -19,7 +19,7 @@ It is designed for private agent-memory operations: recall debugging, contradict
 
 The dashboard can expose sensitive memory content to whoever can reach the web UI. Bind it to `127.0.0.1` unless you intentionally want LAN access.
 
-Admin/mutating endpoints are disabled unless `YANTRIKDB_DASHBOARD_ADMIN_TOKEN` is set. When enabled, requests must include the same value in the `X-Admin-Token` header.
+Admin/mutating endpoints are disabled unless Admin Mode is enabled. Toggle it in the local Settings page, or set `YANTRIKDB_DASHBOARD_ADMIN_MODE=true` before launch.
 
 ## Install
 
@@ -105,20 +105,21 @@ scripts/uninstall-launchd.sh
 | `YANTRIKDB_DASHBOARD_NAMESPACE` | `${YANTRIKDB_NAMESPACE}:hermes:default` | Default namespace selected in UI/API |
 | `YANTRIKDB_EMBEDDING_DIM` | inferred from DB | Override embedding dimension |
 | `YANTRIKDB_EMBEDDER` | dimension-based default | Override embedder name |
-| `YANTRIKDB_DASHBOARD_ADMIN_TOKEN` | unset | Enables admin mutations when set |
+| `YANTRIKDB_DASHBOARD_ADMIN_MODE` | `false` | Enables admin mutations at launch when truthy |
+| `YANTRIKDB_DASHBOARD_SETTINGS_PATH` | `~/.hermes/plugin-data/yantrikdb-dashboard/settings.json` | Persisted dashboard settings |
 | `YANTRIKDB_DASHBOARD_PYTHON` | `python3` | Python binary used by `scripts/start.sh` and `scripts/install-launchd.sh` |
 | `YANTRIKDB_DASHBOARD_LOG_DIR` | `.run` | launchd stdout/stderr directory |
 | `YANTRIKDB_DASHBOARD_LAUNCHD_LABEL` | `io.yantrikdb.dashboard.local` | macOS LaunchAgent label |
 
 ## Admin endpoints
 
-Admin operations include conflict resolution, `think()`, and forgetting memories. They remain unavailable until you set an admin token:
+Admin operations include conflict resolution, `think()`, and forgetting memories. They remain unavailable until Admin Mode is enabled:
 
 ```bash
-export YANTRIKDB_DASHBOARD_ADMIN_TOKEN='choose-a-local-secret'
+export YANTRIKDB_DASHBOARD_ADMIN_MODE=true
 ```
 
-Then enter that token in the dashboard's Admin Token field or send it as `X-Admin-Token`.
+You can also toggle Admin Mode from the dashboard Settings page. Settings changes are accepted only from localhost.
 
 ## Development
 

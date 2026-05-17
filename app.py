@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
-"""Local-only YantrikDB dashboard.
+"""Local-first YantrikDB dashboard.
 
-Read-only by default. Admin mutations require YANTRIKDB_DASHBOARD_ADMIN_TOKEN
-and X-Admin-Token on the request.
+Read-only by default. Admin mutations are controlled by
+YANTRIKDB_DASHBOARD_ADMIN_MODE or the local Settings page.
 """
 from __future__ import annotations
 
@@ -15,7 +15,7 @@ from collections import Counter
 from pathlib import Path
 from typing import Any, Optional
 
-from fastapi import FastAPI, Header, HTTPException, Query, Request
+from fastapi import FastAPI, HTTPException, Query, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, JSONResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
@@ -32,7 +32,17 @@ DEFAULT_DB = Path.home() / ".hermes" / "yantrikdb-memory.db"
 DB_PATH = Path(os.environ.get("YANTRIKDB_DB_PATH") or DEFAULT_DB).expanduser()
 BASE_NAMESPACE = os.environ.get("YANTRIKDB_NAMESPACE", "hermes")
 DEFAULT_NAMESPACE = os.environ.get("YANTRIKDB_DASHBOARD_NAMESPACE", f"{BASE_NAMESPACE}:hermes:default")
-ADMIN_TOKEN = os.environ.get("YANTRIKDB_DASHBOARD_ADMIN_TOKEN", "")
+SETTINGS_PATH = Path(os.environ.get("YANTRIKDB_DASHBOARD_SETTINGS_PATH") or (Path.home() / ".hermes" / "plugin-data" / "yantrikdb-dashboard" / "settings.json")).expanduser()
+
+
+def env_bool(name: str, default: bool = False) -> bool:
+    raw = os.environ.get(name)
+    if raw is None:
+        return default
+    return raw.strip().lower() in {"1", "true", "yes", "on", "enabled"}
+
+
+ADMIN_MODE_ENV = env_bool("YANTRIKDB_DASHBOARD_ADMIN_MODE", False)
 
 app = FastAPI(title="YantrikDB Dashboard", version="0.1.0")
 app.add_middleware(
@@ -104,11 +114,33 @@ def clean_row(d: dict[str, Any]) -> dict[str, Any]:
     return out
 
 
-def require_admin(token: str | None) -> None:
-    if not ADMIN_TOKEN:
-        raise HTTPException(403, "Admin mode is disabled. Set YANTRIKDB_DASHBOARD_ADMIN_TOKEN to enable mutations.")
-    if token != ADMIN_TOKEN:
-        raise HTTPException(403, "Invalid admin token")
+def load_dashboard_settings() -> dict[str, Any]:
+    if not SETTINGS_PATH.exists():
+        return {}
+    try:
+        data = json.loads(SETTINGS_PATH.read_text())
+        return data if isinstance(data, dict) else {}
+    except Exception:
+        return {}
+
+
+def save_dashboard_settings(data: dict[str, Any]) -> None:
+    SETTINGS_PATH.parent.mkdir(parents=True, exist_ok=True)
+    SETTINGS_PATH.write_text(json.dumps(data, indent=2, sort_keys=True) + "\n")
+
+
+def admin_mode_enabled() -> bool:
+    return bool(ADMIN_MODE_ENV or load_dashboard_settings().get("admin_mode"))
+
+
+def is_local_request(request: Request) -> bool:
+    host = (request.client.host if request.client else "") or ""
+    return host in {"127.0.0.1", "::1", "localhost"} or host.startswith("127.")
+
+
+def require_admin(request: Request) -> None:
+    if not admin_mode_enabled():
+        raise HTTPException(403, "Admin mode is disabled. Enable it in Settings or set YANTRIKDB_DASHBOARD_ADMIN_MODE=true.")
 
 
 def infer_embedding_dim() -> int:
@@ -178,6 +210,10 @@ class ThinkRequest(BaseModel):
     consolidation_limit: Optional[int] = None
 
 
+class SettingsRequest(BaseModel):
+    admin_mode: bool
+
+
 @app.get("/")
 def index() -> FileResponse:
     return FileResponse(STATIC_DIR / "index.html")
@@ -209,13 +245,41 @@ def health() -> dict[str, Any]:
         "db_size_bytes": DB_PATH.stat().st_size if DB_PATH.exists() else 0,
         "base_namespace": BASE_NAMESPACE,
         "default_namespace": DEFAULT_NAMESPACE,
-        "admin_enabled": bool(ADMIN_TOKEN),
+        "admin_enabled": admin_mode_enabled(),
+        "admin_mode_env": ADMIN_MODE_ENV,
+        "settings_path": str(SETTINGS_PATH),
         "yantrikdb_version": core_version,
         "embedder": preferred_embedder_for_dim(infer_embedding_dim()) or os.environ.get("YANTRIKDB_EMBEDDER") or "default",
         "embedding_dim": infer_embedding_dim(),
         "plugin": plugin,
         "namespaces": namespaces,
     }
+
+
+@app.get("/api/settings")
+def get_settings() -> dict[str, Any]:
+    stored = load_dashboard_settings()
+    return {
+        "admin_mode": admin_mode_enabled(),
+        "admin_mode_env": ADMIN_MODE_ENV,
+        "admin_mode_stored": bool(stored.get("admin_mode")),
+        "settings_path": str(SETTINGS_PATH),
+        "db_path": str(DB_PATH),
+        "default_namespace": DEFAULT_NAMESPACE,
+        "embedder": preferred_embedder_for_dim(infer_embedding_dim()) or os.environ.get("YANTRIKDB_EMBEDDER") or "default",
+        "embedding_dim": infer_embedding_dim(),
+    }
+
+
+@app.post("/api/settings")
+def update_settings(req: SettingsRequest, request: Request) -> dict[str, Any]:
+    if not is_local_request(request):
+        raise HTTPException(403, "Settings changes are only allowed from localhost.")
+    data = load_dashboard_settings()
+    data["admin_mode"] = bool(req.admin_mode)
+    data["updated_at"] = now()
+    save_dashboard_settings(data)
+    return get_settings()
 
 
 @app.get("/api/stats")
@@ -446,8 +510,8 @@ def conflict_detail(conflict_id: str) -> dict[str, Any]:
 
 
 @app.post("/api/conflicts/{conflict_id}/resolve")
-def resolve_conflict(conflict_id: str, req: ResolveRequest, x_admin_token: str | None = Header(None)) -> dict[str, Any]:
-    require_admin(x_admin_token)
+def resolve_conflict(conflict_id: str, req: ResolveRequest, request: Request) -> dict[str, Any]:
+    require_admin(request)
     try:
         out = engine().resolve_conflict(conflict_id, req.strategy, winner_rid=req.winner_rid, new_text=req.new_text, resolution_note=req.resolution_note)
         return out if isinstance(out, dict) else {"ok": True, "result": out}
@@ -456,8 +520,8 @@ def resolve_conflict(conflict_id: str, req: ResolveRequest, x_admin_token: str |
 
 
 @app.post("/api/think")
-def run_think(req: ThinkRequest, x_admin_token: str | None = Header(None)) -> dict[str, Any]:
-    require_admin(x_admin_token)
+def run_think(req: ThinkRequest, request: Request) -> dict[str, Any]:
+    require_admin(request)
     cfg = req.model_dump(exclude_none=True)
     try:
         out = engine().think(cfg)
@@ -467,8 +531,8 @@ def run_think(req: ThinkRequest, x_admin_token: str | None = Header(None)) -> di
 
 
 @app.post("/api/memory/{rid}/forget")
-def forget_memory(rid: str, x_admin_token: str | None = Header(None)) -> dict[str, Any]:
-    require_admin(x_admin_token)
+def forget_memory(rid: str, request: Request) -> dict[str, Any]:
+    require_admin(request)
     try:
         found = bool(engine().forget(rid))
         return {"rid": rid, "found": found}
