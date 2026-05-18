@@ -145,11 +145,11 @@
   .checkbox-list { @apply grid gap-2 rounded-xl border border-white/10 bg-black/20 p-3 sm:col-span-2; }
   .checkbox-list-title { @apply text-xs font-medium text-zinc-400; }
   .checkbox-pill-row { @apply flex flex-wrap gap-2; }
-  .checkbox-pill { @apply inline-flex cursor-pointer select-none items-center gap-2 rounded-full border border-white/10 bg-white/[.04] px-3.5 py-1.5 text-sm font-semibold text-zinc-200 transition hover:border-white/20 hover:bg-white/[.07]; }
-  .scope-form .checkbox-pill input[type="checkbox"] { @apply relative h-4 min-h-0 w-4 min-w-4 shrink-0 appearance-none rounded border border-white/25 bg-black/50 p-0 align-middle; }
-  .scope-form .checkbox-pill input[type="checkbox"]:checked { @apply border-emerald-400 bg-emerald-400; }
-  .scope-form .checkbox-pill input[type="checkbox"]:checked::after { content: ''; @apply absolute left-1/2 top-1/2 h-2.5 w-1.5 border-b-2 border-r-2 border-black; transform: translate(-50%, -62%) rotate(45deg); }
-  .checkbox-pill:has(input:checked) { @apply border-emerald-400/55 bg-emerald-400/10 text-emerald-50 shadow-[0_0_0_1px_rgba(52,211,153,.16)]; }
+  .checkbox-pill { @apply inline-flex cursor-pointer select-none items-center gap-2 rounded-full border border-white/10 bg-white/[.04] px-3 py-1.5 text-sm font-semibold text-zinc-200 transition hover:border-white/20 hover:bg-white/[.07]; }
+  .checkbox-pill input { @apply sr-only; }
+  .checkbox-pill::before { content: ''; @apply inline-flex h-4 w-4 items-center justify-center rounded-full border border-white/15 bg-black/30 text-[10px] font-black text-black; }
+  .checkbox-pill:has(input:checked) { @apply border-emerald-400/50 bg-emerald-400/10 text-white shadow-[0_0_0_1px_rgba(52,211,153,.16)]; }
+  .checkbox-pill:has(input:checked)::before { content: '✓'; @apply border-emerald-400 bg-emerald-400 text-black; }
   .scope-form button { @apply sm:col-span-2; }
   .actor-filter-row { @apply mb-3 flex w-full flex-wrap items-center justify-between gap-2 rounded-2xl border border-white/10 bg-black/20 p-3; }
   .actor-filter-row label { @apply text-[10px] font-bold uppercase tracking-[.14em] text-zinc-500; }
