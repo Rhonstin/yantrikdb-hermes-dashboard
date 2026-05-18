@@ -138,6 +138,12 @@
   .identity-hero { @apply grid gap-4 md:grid-cols-[minmax(0,1fr)_minmax(260px,.9fr)] md:items-start; }
   .identity-hero h2 { @apply mt-2 text-2xl font-semibold tracking-[-.02em] text-white; }
   .identity-summary { @apply grid grid-cols-2 gap-3 sm:grid-cols-3 xl:grid-cols-5; }
+  .scope-status-row { @apply mt-5 flex max-w-full flex-wrap gap-2; }
+  .scope-status { @apply inline-flex min-w-[180px] max-w-full flex-col gap-1 rounded-2xl border border-white/10 bg-black/25 px-3 py-2 text-left; }
+  .scope-status strong { @apply text-sm font-semibold text-zinc-100; }
+  .scope-status code { @apply block max-w-full overflow-hidden text-ellipsis whitespace-nowrap font-mono text-[11px] font-semibold text-zinc-500; }
+  .scope-status.on { @apply border-emerald-400/20 bg-emerald-400/[.055]; }
+  .scope-status.off { @apply border-white/10 bg-white/[.025] opacity-75; }
   .scope-grid { @apply grid min-w-0 grid-cols-1 gap-5 xl:grid-cols-2; }
   .scope-panel { @apply self-start; }
   .panel-note { @apply -mt-2 mb-4 max-w-[64ch] text-sm leading-6 text-zinc-400; }

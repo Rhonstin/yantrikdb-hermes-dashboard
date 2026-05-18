@@ -418,7 +418,7 @@ function renderIdentityScope(data){
     ['Person scoping', runtime.owner_scoping, 'owner_scoping'],
     ['Shared fallback', runtime.include_base_namespace_recall, 'include_base_namespace_recall'],
     ['Old actor recall', runtime.include_legacy_actor_namespace_recall, 'include_legacy_actor_namespace_recall'],
-  ].map(([label,on,key])=>`<span class="scope-status ${on?'on':'off'}"><strong>${esc(label)}: ${on?'On':'Off'}</strong><code>${esc(key)}</code></span>`).join('');
+  ].map(([label,on,key])=>`<span class="scope-status ${on?'on':'off'}"><strong>${esc(label)}: ${on?'On':'Off'}</strong><code title="${esc(key)}">${esc(key)}</code></span>`).join('');
   $('#identityList').innerHTML=renderScopeRows(cfg.identities,'identities');
   renderActorIdentityFilter(cfg);
   $('#actorList').innerHTML=renderScopeRows(filteredActors(cfg),'actors');

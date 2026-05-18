@@ -517,3 +517,14 @@ def test_sidebar_credit_links_are_present():
 def test_sidebar_credit_hidden_in_mobile_header():
     css_source = Path("src/styles.css").read_text()
     assert ".side-card, .sidebar-credit { display: none; }" in css_source
+
+
+def test_identity_scope_status_chips_have_layout_styles():
+    css_source = Path("src/styles.css").read_text()
+    assert ".scope-status-row" in css_source
+    assert ".scope-status" in css_source
+    assert "flex-col" in css_source
+    assert "text-ellipsis" in css_source
+    js = Path("static/app.js").read_text()
+    assert "scope-status" in js
+    assert "title=\"${esc(key)}\"" in js
