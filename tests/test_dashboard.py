@@ -599,3 +599,11 @@ def test_identity_namespace_coverage_uses_mobile_cards():
     assert ".namespace-coverage-head { @apply grid" in css
     assert ".coverage-status" in css
     assert "whitespace-normal" in css
+
+
+def test_identity_namespace_coverage_does_not_use_table_wrapper_border():
+    html = Path("static/index.html").read_text()
+    assert 'id="identityNamespaceTable" class="coverage-wrap"' in html
+    assert 'id="identityNamespaceTable" class="table-wrap"' not in html
+    css = Path("src/styles.css").read_text()
+    assert ".coverage-wrap { @apply max-w-full overflow-visible rounded-none border-0 bg-transparent; }" in css

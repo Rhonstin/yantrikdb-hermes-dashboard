@@ -190,6 +190,7 @@
   .mapped-owner { @apply flex min-w-0 flex-col gap-1; }
   .mapped-owner strong { @apply text-sm font-semibold text-zinc-100; }
   .mapped-owner span { @apply w-fit max-w-full rounded-full border border-white/10 bg-white/[.04] px-2 py-0.5 text-[10px] font-bold uppercase tracking-[.14em] text-zinc-500; }
+  .coverage-wrap { @apply max-w-full overflow-visible rounded-none border-0 bg-transparent; }
   .namespace-coverage-list { @apply grid gap-3; }
   .namespace-coverage-card { @apply min-w-0 rounded-2xl border border-white/10 bg-white/[.025] p-3; }
   .namespace-coverage-head { @apply grid min-w-0 grid-cols-[minmax(0,1fr)_auto] items-start gap-3; }
