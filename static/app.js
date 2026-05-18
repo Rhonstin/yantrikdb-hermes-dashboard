@@ -1,6 +1,6 @@
 const $ = (s) => document.querySelector(s);
 const $$ = (s) => [...document.querySelectorAll(s)];
-const state = { health:null, stats:null, settings:null, namespace:'', view:'overview', memoryOffset:0, selectedMemory:null };
+const state = { health:null, stats:null, settings:null, defaultNamespace:'', selectedNamespace:'__all__', view:'overview', memoryOffset:0, selectedMemory:null };
 const VALID_VIEWS = new Set(['overview','visualiser','memories','recall','conflicts','graph','lifecycle','ops','settings']);
 const ALL_NAMESPACES = '__all__';
 const DEFAULT_VIZ_CAMERA = { rotation:.55, tilt:.78, zoom:1, panX:0, panY:0 };
@@ -18,22 +18,24 @@ async function api(path, opts={}){
   if(!res.ok) throw new Error(data.detail || data.error || res.statusText);
   return data;
 }
-function ns(){ return $('#scopeSelect')?.value || $('#memoryNamespaceFilter')?.value || $('#namespaceSelect')?.value || ALL_NAMESPACES; }
-function setNamespace(value){ const v=value || ALL_NAMESPACES; if($('#scopeSelect')) $('#scopeSelect').value=v; if($('#namespaceSelect')) $('#namespaceSelect').value=v; if($('#memoryNamespaceFilter')) $('#memoryNamespaceFilter').value=v; }
+function ns(){ return state.selectedNamespace || ALL_NAMESPACES; }
+function setNamespace(value){ const v=value || ALL_NAMESPACES; state.selectedNamespace=v; if($('#scopeSelect')) $('#scopeSelect').value=v; if($('#memoryNamespaceFilter')) $('#memoryNamespaceFilter').value=v; }
 function syncMemoryFiltersFromUrl(params=new URLSearchParams(location.search)){
   if(params.has('q')) $('#memorySearch').value=params.get('q')||'';
   if(params.has('status')) $('#statusFilter').value=params.get('status')||'active';
   if(params.has('domain')) $('#domainFilter').value=params.get('domain')||'';
   if(params.has('source')) $('#sourceFilter').value=params.get('source')||'';
   if(params.has('sort')) $('#sortFilter').value=params.get('sort')||'created_at';
-  if(params.has('namespace')) setNamespace(params.get('namespace') || state.namespace);
+  if(params.has('namespace')) setNamespace(params.get('namespace') || ALL_NAMESPACES);
 }
 function routeUrlFor(view){
   const url=new URL(location.href); url.searchParams.set('view',view); url.searchParams.delete('memory');
   ['q','status','domain','source','sort'].forEach(k=>url.searchParams.delete(k));
+  const selectedNs=ns();
+  if(selectedNs && selectedNs!==ALL_NAMESPACES) url.searchParams.set('namespace', selectedNs); else url.searchParams.delete('namespace');
   if(view==='memories'){
-    const vals={namespace:ns(),q:$('#memorySearch')?.value||'',status:$('#statusFilter')?.value||'active',domain:$('#domainFilter')?.value||'',source:$('#sourceFilter')?.value||'',sort:$('#sortFilter')?.value||'created_at'};
-    for(const [k,v] of Object.entries(vals)) if(v && !(['status','sort','namespace'].includes(k) && ['active','created_at',ALL_NAMESPACES].includes(v))) url.searchParams.set(k,v);
+    const vals={q:$('#memorySearch')?.value||'',status:$('#statusFilter')?.value||'active',domain:$('#domainFilter')?.value||'',source:$('#sourceFilter')?.value||'',sort:$('#sortFilter')?.value||'created_at'};
+    for(const [k,v] of Object.entries(vals)) if(v && !(['status','sort'].includes(k) && ['active','created_at'].includes(v))) url.searchParams.set(k,v);
   }
   return url;
 }
@@ -88,7 +90,6 @@ async function init(){
   $('#closeMemoryDrawer')?.addEventListener('click',()=>closeMemoryDetail());
   $('#memoryDrawer')?.addEventListener('click',(e)=>{ if(e.target.id==='memoryDrawer') closeMemoryDetail(); });
   $('#scopeSelect')?.addEventListener('change',()=>{ setNamespace($('#scopeSelect').value); state.memoryOffset=0; writeRoute(state.view,{replace:true}); refreshAll(); });
-  $('#namespaceSelect').onchange=()=>{ setNamespace($('#namespaceSelect').value); refreshAll(); };
   $('#memoryNamespaceFilter')?.addEventListener('change',()=>{ setNamespace($('#memoryNamespaceFilter').value); state.memoryOffset=0; writeRoute('memories',{replace:true}); refreshAll(); });
   $('#memoryApply').onclick=()=>{state.memoryOffset=0; writeRoute('memories',{replace:true}); loadMemories();};
   $('#memoryReset')?.addEventListener('click',()=>{ $('#memorySearch').value=''; $('#statusFilter').value='active'; $('#domainFilter').value=''; $('#sourceFilter').value=''; $('#sortFilter').value='created_at'; state.memoryOffset=0; writeRoute('memories',{replace:true}); loadMemories(); });
@@ -121,7 +122,7 @@ function selectedNamespaceMeta(){
   const total=rows.reduce((a,n)=>a+Number(n.count||0),0);
   if(current===ALL_NAMESPACES) return {name:'All namespaces', count:total, all:true};
   const found=rows.find(n=>n.namespace===current);
-  return {name:current || state.namespace, count:found?.count ?? null, all:false};
+  return {name:current || state.defaultNamespace, count:found?.count ?? null, all:false};
 }
 function updateScopeUi(){
   const meta=selectedNamespaceMeta();
@@ -131,19 +132,19 @@ function updateScopeUi(){
   $('#opsScopeName') && ($('#opsScopeName').textContent=meta.name);
   $('#opsScopeCount') && ($('#opsScopeCount').textContent=count);
   $('#opsScopeName')?.closest('.maintenance-scope')?.classList.toggle('all-scope', !!meta.all);
-  const db=$('#dbPath'); if(db) db.textContent=meta.all ? `${count} across all scopes` : `${count || 'No count'} · ${state.health?.db_path || ''}`;
   if($('#settingsExportLink')) $('#settingsExportLink').href=`/api/export/memories.jsonl?namespace=${encodeURIComponent(ns())}&status=active`;
 }
 async function refreshAll(){
   state.health=await api('/api/health');
   state.settings=await api('/api/settings');
-  state.namespace=state.health.default_namespace;
+  state.defaultNamespace=state.health.default_namespace;
   const nsRows=state.health.namespaces||[];
   const options=`<option value="${ALL_NAMESPACES}">All namespaces (${fmt(nsRows.reduce((a,n)=>a+Number(n.count||0),0))})</option>`+nsRows.map(n=>`<option value="${esc(n.namespace)}">${esc(n.namespace)} (${fmt(n.count)})</option>`).join('');
-  const sel=$('#namespaceSelect'); const memSel=$('#memoryNamespaceFilter'); const scopeSel=$('#scopeSelect');
+  const memSel=$('#memoryNamespaceFilter'); const scopeSel=$('#scopeSelect');
   const requested=new URLSearchParams(location.search).get('namespace');
-  const prev=(requested || scopeSel?.value || memSel?.value || sel?.value || ALL_NAMESPACES);
-  [sel,memSel,scopeSel].filter(Boolean).forEach(s=>{
+  const prev=(requested || state.selectedNamespace || ALL_NAMESPACES);
+  state.selectedNamespace=prev;
+  [memSel,scopeSel].filter(Boolean).forEach(s=>{
     s.innerHTML=options;
     if(![...s.options].some(o=>o.value===prev)) s.insertAdjacentHTML('afterbegin',`<option value="${esc(prev)}">${esc(prev)}</option>`);
     s.value=prev;
