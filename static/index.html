@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>YantrikDB Dashboard</title>
   <link rel="icon" href="/static/assets/favicon.svg?v=yantrikdb-white-favicon-2" type="image/svg+xml">
-  <link rel="stylesheet" href="/static/styles.css?v=impeccable-polish-12" />
+  <link rel="stylesheet" href="/static/styles.css?v=impeccable-polish-13" />
 </head>
 <body>
   <div class="grain"></div>
@@ -191,14 +191,17 @@
         </div>
         <div class="panel scope-panel">
           <div class="panel-head"><h2>Detected actors</h2><span class="muted">auto-discovered platform accounts</span></div>
-          <p class="panel-note">Actors come from the existing YantrikDB identity map and live memory namespaces. Use this only to correct who an actor belongs to.</p>
-          <form id="actorForm" class="scope-form subtle-form" aria-label="Map actor to identity">
-            <input id="actorPlatform" placeholder="Platform, e.g. whatsapp" autocomplete="off" />
-            <input id="actorId" placeholder="Actor ID, e.g. 191...@lid" autocomplete="off" />
-            <select id="actorIdentity" aria-label="Actor identity"></select>
-            <button class="btn secondary" type="submit">Save actor mapping</button>
-          </form>
+          <p class="panel-note">Actors are discovered from configured mappings and live memory buckets. Change the identity inline, then save that row.</p>
           <div id="actorList" class="scope-list"></div>
+          <details class="details-block add-actor-details">
+            <summary>Add actor mapping manually</summary>
+            <form id="actorForm" class="scope-form subtle-form" aria-label="Map actor to identity">
+              <input id="actorPlatform" placeholder="Platform, e.g. whatsapp" autocomplete="off" />
+              <input id="actorId" placeholder="Actor ID, e.g. 191...@lid" autocomplete="off" />
+              <select id="actorIdentity" aria-label="Actor identity"></select>
+              <button class="btn secondary" type="submit">Add actor mapping</button>
+            </form>
+          </details>
         </div>
         <div class="panel scope-panel">
           <div class="panel-head"><h2>Shared scopes</h2><span class="muted">groups and spaces</span></div>
@@ -228,7 +231,7 @@
       </div>
       <div class="panel advanced-panel">
         <div class="panel-head"><h2>Advanced config</h2><span class="muted">optional JSON</span></div>
-        <p class="page-copy">Use the forms above for normal edits. This JSON is only for bulk review or advanced fixes. Saving requires Admin Mode.</p>
+        <p class="page-copy">Use the page controls for normal edits. This JSON is only for bulk review or advanced fixes. Saving requires Admin Mode.</p>
         <details class="details-block">
           <summary>Show raw registry JSON</summary>
           <textarea id="identityScopeJson" class="json-editor" spellcheck="false" aria-label="Identity and scope JSON"></textarea>
@@ -349,6 +352,6 @@
       <div class="modal-actions"><button id="confirmCancel" class="btn secondary">Cancel</button><button id="confirmOk" class="btn primary">Continue</button></div>
     </div>
   </div>
-  <script src="/static/app.js?v=impeccable-polish-12"></script>
+  <script src="/static/app.js?v=impeccable-polish-13"></script>
 </body>
 </html>

@@ -196,9 +196,14 @@ async function refreshAll(){
 function compactJson(value){ return JSON.stringify(value||{}, null, 2); }
 function chip(label, value){ return `<div class="scope-chip"><span>${esc(label)}</span><strong>${esc(value || '—')}</strong></div>`; }
 function scopeEmpty(title, body){ return `<div class="empty helpful-empty"><strong>${esc(title)}</strong><span>${esc(body)}</span></div>`; }
-function sourceBadge(item){
-  const source=item.source==='yantrikdb_identity_map'?'Auto-detected':(item.source==='namespace_inventory'?'Detected from memory bucket':'Dashboard');
-  return `<span class="pill neutral">${esc(source)}</span>`;
+function sourceLabel(item){
+  return item.source==='yantrikdb_identity_map'?'configured identity map':(item.source==='namespace_inventory'?'memory bucket discovery':'dashboard edit');
+}
+function identitySelectMarkup(selected, raw){
+  const cfg=identityConfig();
+  const ids=availableIdentityOptions(cfg).filter(Boolean);
+  const opts=['', ...ids].filter((v,i,a)=>a.indexOf(v)===i);
+  return `<select class="inline-identity-select" data-actor-select="${esc(raw)}" aria-label="Identity for ${esc(raw)}">${opts.map(id=>`<option value="${esc(id)}" ${id===(selected||'')?'selected':''}>${esc(id || 'Unassigned')}</option>`).join('')}</select>`;
 }
 function renderScopeRows(items, kind){
   if(!items?.length){
@@ -215,17 +220,15 @@ function renderScopeRows(items, kind){
     const pieces=[]; let actions=''; let detail='';
     if(kind==='identities'){
       pieces.push(chip('Person ID', item.id), chip('Display name', item.label || item.id));
-      if(item.source) pieces.push(sourceBadge(item));
-      detail = `<details class="scope-technical"><summary>Technical details</summary><div><span>Owner ID</span><code>${esc(item.private_scope || '')}</code></div>${item.resolved_scope?`<div><span>Storage namespace</span><code>${esc(item.resolved_scope)}</code></div>`:''}</details>`;
+      detail = `<details class="scope-technical"><summary>Technical details</summary><div><span>Owner ID</span><code>${esc(item.private_scope || '')}</code></div>${item.resolved_scope?`<div><span>Storage namespace</span><code>${esc(item.resolved_scope)}</code></div>`:''}${item.source?`<div><span>Source</span><code>${esc(sourceLabel(item))}</code></div>`:''}</details>`;
       actions = `<button class="btn tiny secondary" type="button" data-edit-identity="${esc(item.id||'')}">Edit person</button>`;
     }
     if(kind==='actors'){
       const raw = `${item.platform||''}:${item.actor_id||''}`;
-      pieces.push(chip('Platform', item.platform), chip('Actor ID', item.actor_id), chip('Belongs to', item.identity || 'Unassigned'));
+      pieces.push(chip('Platform', item.platform), chip('Actor ID', item.actor_id));
       if(item.alias) pieces.push(chip('Known alias', item.alias));
-      if(item.source) pieces.push(sourceBadge(item));
-      detail = item.legacy_scope ? `<details class="scope-technical"><summary>Technical namespace</summary><code>${esc(item.legacy_scope)}</code></details>` : '';
-      actions = `<button class="btn tiny secondary" type="button" data-edit-actor="${esc(raw)}">Change owner</button>`;
+      detail = `<details class="scope-technical"><summary>Technical details</summary>${item.legacy_scope?`<div><span>Namespace</span><code>${esc(item.legacy_scope)}</code></div>`:''}${item.source?`<div><span>Source</span><code>${esc(sourceLabel(item))}</code></div>`:''}</details>`;
+      actions = `<div class="inline-identity-control"><span>Identity</span>${identitySelectMarkup(item.identity, raw)}<button class="btn tiny primary" type="button" data-save-actor-identity="${esc(raw)}">Save</button></div>`;
     }
     if(kind==='spaces'){
       pieces.push(chip('Space', item.id), chip('Members', Array.isArray(item.members)?item.members.join(', '):(item.members||'')));
@@ -241,7 +244,7 @@ function renderScopeRows(items, kind){
 }
 function bindIdentityScopeRowActions(){
   $$('[data-edit-identity]').forEach(btn=>btn.onclick=()=>fillIdentityForm(btn.dataset.editIdentity));
-  $$('[data-edit-actor]').forEach(btn=>btn.onclick=()=>fillActorForm(btn.dataset.editActor));
+  $$('[data-save-actor-identity]').forEach(btn=>btn.onclick=()=>saveInlineActorIdentity(btn.dataset.saveActorIdentity));
   $$('[data-edit-space]').forEach(btn=>btn.onclick=()=>fillSpaceForm(btn.dataset.editSpace));
   $$('[data-edit-conversation]').forEach(btn=>btn.onclick=()=>fillConversationForm(btn.dataset.editConversation));
 }
@@ -289,6 +292,15 @@ async function persistIdentityConfig(cfg, message='Identity & Scope registry sav
   $('#identityScopeJson').value=compactJson(cfg);
   const data=await api('/api/identity-scope',{method:'POST',body:JSON.stringify({identity_scope:cfg})});
   renderIdentityScope(data); toast(message);
+}
+
+async function saveInlineActorIdentity(raw){
+  const cfg=identityConfig();
+  const actor=(cfg.actors||[]).find(a=>`${a.platform}:${a.actor_id}`===raw);
+  const select=document.querySelector(`[data-actor-select="${CSS.escape(raw)}"]`);
+  if(!actor || !select){ toast('Actor row not found'); return; }
+  actor.identity=select.value || '';
+  try{ await persistIdentityConfig(cfg, actor.identity ? 'Actor identity updated' : 'Actor marked unassigned'); }catch(err){ toast(err.message || 'Could not update actor identity'); }
 }
 
 function fillIdentityForm(id){

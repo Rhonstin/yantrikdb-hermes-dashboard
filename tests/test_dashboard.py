@@ -281,6 +281,7 @@ def test_index_has_identity_scope_page_contract():
     assert 'id="identityScopeJson"' in html
     assert 'id="identityForm"' in html
     assert 'id="actorForm"' in html
+    assert "Add actor mapping manually" in html
     assert 'id="spaceForm"' in html
     assert 'id="conversationForm"' in html
     assert "Detected actors" in html
@@ -288,13 +289,16 @@ def test_index_has_identity_scope_page_contract():
     assert "Edit person" in js
     assert "Technical details" in js
     assert "Storage namespace" in js
-    assert "Belongs to" in js
+    assert "inline-identity-select" in js
+    assert "data-save-actor-identity" in js
+    assert "Identity" in js
     assert "Unassigned" in js
-    assert "Detected from memory bucket" in js
+    assert "memory bucket discovery" in js
     assert "identity-scope" in js
     assert "/api/identity-scope" in js
     assert "addIdentityFromForm" in js
     assert "addActorFromForm" in js
+    assert "saveInlineActorIdentity" in js
     assert "addSpaceFromForm" in js
     assert "addConversationFromForm" in js
 
