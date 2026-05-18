@@ -286,6 +286,8 @@ def test_index_has_identity_scope_page_contract():
     assert "Detected actors" in html
     assert "who each memory bucket belongs to" in html
     assert "Edit person" in js
+    assert "Technical details" in js
+    assert "Storage namespace" in js
     assert "Belongs to" in js
     assert "Unassigned" in js
     assert "Detected from memory bucket" in js
@@ -342,3 +344,28 @@ def test_identity_scope_api_detects_unassigned_actor_from_namespace(tmp_path, mo
     assert actor["identity"] == ""
     assert actor["source"] == "namespace_inventory"
     assert data["namespace_inventory"][0]["mapped"] is False
+
+
+def test_identity_scope_dashboard_edits_override_imported_identity_map(tmp_path, monkeypatch):
+    import sqlite3
+
+    db_path = tmp_path / "yantrikdb.db"
+    with sqlite3.connect(db_path) as conn:
+        conn.execute("CREATE TABLE memories (rid TEXT PRIMARY KEY, namespace TEXT)")
+    identity_map = tmp_path / "identity-map.json"
+    identity_map.write_text('{"owners":{"owner:person-alpha":{"actors":["chat:actor-alpha"]}}}')
+    config = tmp_path / "yantrikdb.json"
+    config.write_text('{"identity_map_path":"' + str(identity_map) + '"}')
+    monkeypatch.setattr(dashboard, "DB_PATH", db_path)
+    monkeypatch.setattr(dashboard, "SETTINGS_PATH", tmp_path / "settings.json")
+    monkeypatch.setattr(dashboard, "YANTRIKDB_CONFIG_PATH", config)
+    dashboard.save_dashboard_settings({"identity_scope": {"identities": [
+        {"id": "person-alpha", "label": "Person Alpha Edited", "private_scope": "owner:person-alpha"}
+    ], "actors": [], "spaces": [], "conversations": []}})
+
+    data = TestClient(dashboard.app).get("/api/identity-scope").json()
+
+    identity = data["identity_scope"]["identities"][0]
+    assert identity["label"] == "Person Alpha Edited"
+    assert identity["resolved_scope"].startswith("owner:owner-person-alpha-")
+    assert identity["source"] == "dashboard"

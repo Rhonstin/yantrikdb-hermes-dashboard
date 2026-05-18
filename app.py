@@ -421,6 +421,12 @@ def load_yantrikdb_identity_scope_config() -> dict[str, list[dict[str, Any]]]:
 
 
 def merge_identity_scope_config(primary: dict[str, list[dict[str, Any]]], imported: dict[str, list[dict[str, Any]]]) -> dict[str, list[dict[str, Any]]]:
+    """Merge auto-imported defaults with dashboard edits.
+
+    Imported provider rows are discovery defaults. Dashboard-local rows must win
+    so editing a detected person/actor in the UI persists instead of being
+    overwritten on the next reload.
+    """
     merged = default_identity_scope_config()
     keys = {
         "identities": lambda item: str(item.get("id") or item.get("private_scope") or item),
@@ -429,14 +435,21 @@ def merge_identity_scope_config(primary: dict[str, list[dict[str, Any]]], import
         "conversations": lambda item: f"{item.get('platform','')}:{item.get('conversation_id','')}",
     }
     for key, key_fn in keys.items():
-        seen: set[str] = set()
-        for source in (imported.get(key, []), primary.get(key, [])):
-            for item in source:
-                marker = key_fn(item)
-                if marker in seen:
-                    continue
-                merged[key].append(item)
-                seen.add(marker)
+        by_key: dict[str, dict[str, Any]] = {}
+        order: list[str] = []
+        for item in imported.get(key, []):
+            marker = key_fn(item)
+            if marker not in by_key:
+                order.append(marker)
+            by_key[marker] = dict(item)
+        for item in primary.get(key, []):
+            marker = key_fn(item)
+            if marker not in by_key:
+                order.append(marker)
+            combined = {**by_key.get(marker, {}), **dict(item)}
+            combined["source"] = "dashboard" if item.get("source") != "namespace_inventory" else "namespace_inventory"
+            by_key[marker] = combined
+        merged[key] = [by_key[marker] for marker in order if marker in by_key]
     return merged
 
 

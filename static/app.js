@@ -216,7 +216,7 @@ function renderScopeRows(items, kind){
     if(kind==='identities'){
       pieces.push(chip('Person ID', item.id), chip('Display name', item.label || item.id));
       if(item.source) pieces.push(sourceBadge(item));
-      detail = `<details class="scope-technical"><summary>Technical owner</summary><code>${esc(item.private_scope || '')}</code>${item.resolved_scope?`<code>${esc(item.resolved_scope)}</code>`:''}</details>`;
+      detail = `<details class="scope-technical"><summary>Technical details</summary><div><span>Owner ID</span><code>${esc(item.private_scope || '')}</code></div>${item.resolved_scope?`<div><span>Storage namespace</span><code>${esc(item.resolved_scope)}</code></div>`:''}</details>`;
       actions = `<button class="btn tiny secondary" type="button" data-edit-identity="${esc(item.id||'')}">Edit person</button>`;
     }
     if(kind==='actors'){
