@@ -812,9 +812,7 @@ function updateThreeUI(){
   if(legend) legend.innerHTML = threeVis.mode === 'neural'
     ? '<span><i class="legend-dot entity"></i>Neuron hub</span><span><i class="legend-dot memory"></i>Memory soma</span><span><i class="legend-line"></i>Synapse</span>'
     : '<span><i class="legend-dot entity"></i>Entity/topic</span><span><i class="legend-dot memory"></i>Memory</span><span><i class="legend-line"></i>Link</span>';
-  const help = $('#threeHelp'); if(help) help.textContent = threeVis.mode === 'neural'
-    ? (window.matchMedia('(max-width: 760px)').matches ? 'Drag to orbit · right-click drag to pan · pinch to zoom · tap a neuron.' : 'Drag to orbit the neural cloud · right-click/Shift-drag to pan · wheel/pinch to zoom.')
-    : 'Drag to rotate · right-click/Shift-drag to pan · wheel/pinch to zoom.';
+  const help = $('#threeHelp'); if(help) help.textContent = 'Drag to rotate · Right-click/Shift+drag to pan · Wheel/pinch to zoom.';
   const compact = window.matchMedia('(max-width: 760px)').matches;
   const pause = $('#threePause'); if(pause) pause.textContent = threeVis.paused ? (compact ? 'Resume' : (threeVis.mode === 'neural' ? 'Resume drift' : 'Resume rotation')) : (compact ? 'Pause' : (threeVis.mode === 'neural' ? 'Pause drift' : 'Pause rotation'));
   const pan = $('#threePanMode'); if(pan) pan.textContent = threeVis.panMode ? (compact ? 'Orbit' : 'Orbit mode') : (compact ? 'Pan' : 'Pan mode');
