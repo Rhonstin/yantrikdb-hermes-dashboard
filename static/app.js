@@ -754,7 +754,7 @@ function visualiserSearchNode(node){
 }
 function inspectThreeNode(node){
   const mode = threeVis.mode === 'neural' ? 'Neural Map 3D' : 'Constellation 3D';
-  $('#threeInspector').innerHTML = `<div class="inspector-kicker">${mode} · ${esc(node.kind || 'entity')}</div><h3>${esc(node.label)}</h3><p class="muted">${esc(node.category || 'Other')} · ${Number(node.count || 0).toLocaleString()} signal(s) · weight ${Number(node.weight || 0).toFixed(2)}</p>${node.preview ? `<p>${esc(node.preview)}</p>` : ''}<div class="inspector-actions">${node.memory_id ? '<button id="threeMemory" class="primary tiny">Open memory</button>' : ''}<button id="threeSearch" class="tiny">Search this</button></div>`;
+  $('#threeInspector').innerHTML = `<div class="inspector-kicker">${mode} · ${esc(node.kind || 'entity')}</div><h3>${esc(node.label)}</h3><p class="muted">${esc(node.category || 'Other')} · ${Number(node.count || 0).toLocaleString()} signal(s) · weight ${Number(node.weight || 0).toFixed(2)}</p>${node.preview ? `<p>${esc(node.preview)}</p>` : ''}<div class="inspector-actions">${node.memory_id ? '<button id="threeMemory" class="btn primary tiny">Open memory</button>' : ''}<button id="threeSearch" class="btn secondary tiny">Search this</button></div>`;
   if(node.memory_id) $('#threeMemory').onclick = () => selectMemory(node.memory_id);
   $('#threeSearch').onclick = () => visualiserSearchNode(node);
 }

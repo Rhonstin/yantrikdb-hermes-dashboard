@@ -564,3 +564,10 @@ def test_renamed_repo_metadata_uses_new_slug():
     assert "~/.hermes/plugins/yantrikdb-hermes-dashboard" in readme
     assert "~/.hermes/plugin-data/yantrikdb-hermes-dashboard/settings.json" in readme
     assert "LEGACY_SETTINGS_PATH" in Path("app.py").read_text()
+
+
+def test_three_visualiser_inspector_actions_use_button_styles():
+    js = Path("static/app.js").read_text()
+    assert 'id="threeMemory" class="btn primary tiny"' in js
+    assert 'id="threeSearch" class="btn secondary tiny"' in js
+    assert 'id="threeSearch" class="tiny"' not in js
