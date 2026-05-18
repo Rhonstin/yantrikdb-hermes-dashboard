@@ -148,8 +148,8 @@
   .checkbox-pill { @apply inline-flex cursor-pointer select-none items-center gap-2 rounded-full border border-white/10 bg-white/[.04] px-3 py-1.5 text-sm font-semibold text-zinc-200 transition hover:border-white/20 hover:bg-white/[.07]; }
   .checkbox-pill input { @apply sr-only; }
   .checkbox-pill::before { content: ''; @apply inline-flex h-4 w-4 items-center justify-center rounded-full border border-white/15 bg-black/30 text-[10px] font-black text-black; }
-  .checkbox-pill:has(input:checked) { @apply border-yan-hot/60 bg-yan-hot/15 text-white shadow-[0_0_0_1px_rgba(255,122,24,.18)]; }
-  .checkbox-pill:has(input:checked)::before { content: '✓'; @apply border-yan-hot bg-yan-hot text-black; }
+  .checkbox-pill:has(input:checked) { @apply border-emerald-400/50 bg-emerald-400/10 text-white shadow-[0_0_0_1px_rgba(52,211,153,.16)]; }
+  .checkbox-pill:has(input:checked)::before { content: '✓'; @apply border-emerald-400 bg-emerald-400 text-black; }
   .scope-form button { @apply sm:col-span-2; }
   .actor-filter-row { @apply mb-3 flex w-full flex-wrap items-center justify-between gap-2 rounded-2xl border border-white/10 bg-black/20 p-3; }
   .actor-filter-row label { @apply text-[10px] font-bold uppercase tracking-[.14em] text-zinc-500; }
