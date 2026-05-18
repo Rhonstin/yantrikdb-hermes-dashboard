@@ -502,3 +502,12 @@ def test_memory_scoping_controls_auto_save_on_change():
     assert "#includeBaseRecallToggle" in js
     assert "#includeActorRecallToggle" in js
     assert "#topKSetting" in js
+
+
+def test_sidebar_credit_links_are_present():
+    html = Path("static/index.html").read_text()
+    assert "Dashboard built by" in html
+    assert "https://github.com/wysie" in html
+    assert "https://github.com/spranab" in html
+    assert "https://github.com/yantrikos/y" in html
+    assert html.count('rel="noopener noreferrer"') >= 3
