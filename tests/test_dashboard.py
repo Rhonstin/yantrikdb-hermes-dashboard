@@ -648,13 +648,20 @@ def test_visualiser_fullscreen_control_lives_in_viewport():
     assert "canvas.width = 1024; canvas.height = 640;" in js
     assert "precision:'highp'" in js
     assert "text-rendering: geometricPrecision" in css
+    assert "Right-click drag to pan" in html
+    assert "Drag to rotate · right-click/Shift-drag to pan · wheel/pinch to zoom." in js
+    assert "e.button===2 || threeVis.panMode || e.shiftKey" in js
+    assert "if(d.mode === 'pan')" in js
+    assert "canvas.addEventListener('contextmenu',e=>e.preventDefault())" in js
+    assert "rightPan=e.button===2" in js
+    assert "Admin mode enabled" not in html
     assert html.index('id="threeFullscreen"') > html.index('id="threeViewport"')
     assert html.index('id="threeFullscreen"') < html.index('id="threeLabels"')
     assert 'id="threeFullscreen" class="btn secondary"' not in html
     assert ".viewport-fullscreen" in css
     assert ".three-viewport:fullscreen .viewport-fullscreen { display: none; }" in css
     assert ".viewport-fullscreen" in js
-    assert "Drag to rotate · Pinch to zoom · Pan to move." in html
+    assert "Drag to rotate · Right-click drag to pan · Pinch/scroll to zoom." in html
 
 
 def test_identity_namespace_coverage_uses_mobile_cards():
