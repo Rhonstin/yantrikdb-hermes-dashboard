@@ -553,6 +553,17 @@ def test_memory_status_active_uses_good_not_hot_pill():
     assert "<span class=\"pill hot\">${esc(statusLabel(m.consolidation_status))}" not in js
 
 
+def test_memory_detail_actions_use_neutral_copy_and_destructive_forget():
+    js = Path("static/app.js").read_text()
+    css_source = Path("src/styles.css").read_text()
+    assert '<button class="drawer-action" onclick="showSelectableCopy(\'RID\',\'${rid}\')">Copy RID</button>' in js
+    assert '<button class="drawer-action danger" onclick="forgetSelected(\'${rid}\')">Forget memory</button>' in js
+    assert ".drawer-action.danger" in css_source
+    assert "border-[rgba(239,68,68,.45)]" in css_source
+    assert "drawer-action primary" not in js
+    assert "drawer-action warn" not in js
+
+
 def test_readme_documents_hermes_plugin_install_and_no_admin_token():
     readme = Path("README.md").read_text()
     assert "# YantrikDB for Hermes Dashboard" in readme

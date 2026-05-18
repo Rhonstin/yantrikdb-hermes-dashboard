@@ -691,8 +691,8 @@ function detailHtml(m){
     <h2 class="memory-detail-title">${title}</h2>
     <div class="detail-content">${esc(m.text)}</div>
     <div class="drawer-actions">
-      <button class="drawer-action primary" onclick="showSelectableCopy('RID','${rid}')">Copy RID</button>
-      <button class="drawer-action warn" onclick="forgetSelected('${rid}')">Forget memory</button>
+      <button class="drawer-action" onclick="showSelectableCopy('RID','${rid}')">Copy RID</button>
+      <button class="drawer-action danger" onclick="forgetSelected('${rid}')">Forget memory</button>
     </div>
     <div class="diag-grid">
       ${diag('RID', rid, true)}${diag('Namespace', m.namespace, true)}${diag('Source', m.source)}${diag('Type', m.type)}${diag('Importance', Number(m.importance||0).toFixed(3))}${diag('Certainty', Number(m.certainty||0).toFixed(3))}${diag('Access count', m.access_count)}${diag('Created', m.created_at_iso)}${diag('Updated', m.updated_at_iso)}${diag('Embedding bytes', m.embedding_bytes)}
