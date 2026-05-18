@@ -282,6 +282,7 @@ def test_index_has_identity_scope_page_contract():
     assert 'id="identityForm"' in html
     assert 'id="actorForm"' in html
     assert "Add actor mapping manually" in html
+    assert 'id="actorIdentityFilter"' in html
     assert 'id="spaceForm"' in html
     assert 'id="conversationForm"' in html
     assert '<h2>Actors</h2><span class="muted">platform accounts</span>' in html
@@ -289,6 +290,8 @@ def test_index_has_identity_scope_page_contract():
     assert "Edit person" in js
     assert "Technical details" in js
     assert "Storage namespace" in js
+    assert "actorIdentityFilterOptions" in js
+    assert "filteredActors" in js
     assert "inline-identity-select" in js
     assert "data-save-actor-identity" in js
     assert "Identity" in js

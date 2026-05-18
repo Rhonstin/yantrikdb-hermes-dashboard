@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>YantrikDB Dashboard</title>
   <link rel="icon" href="/static/assets/favicon.svg?v=yantrikdb-white-favicon-2" type="image/svg+xml">
-  <link rel="stylesheet" href="/static/styles.css?v=impeccable-polish-14" />
+  <link rel="stylesheet" href="/static/styles.css?v=impeccable-polish-15" />
 </head>
 <body>
   <div class="grain"></div>
@@ -192,6 +192,10 @@
         <div class="panel scope-panel">
           <div class="panel-head"><h2>Actors</h2><span class="muted">platform accounts</span></div>
           <p class="panel-note">Platform accounts mapped to people. Change the identity inline, then save that row.</p>
+          <div class="actor-filter-row">
+            <label for="actorIdentityFilter">Identity</label>
+            <select id="actorIdentityFilter" aria-label="Filter actors by identity"></select>
+          </div>
           <div id="actorList" class="scope-list"></div>
           <details class="details-block add-actor-details">
             <summary>Add actor mapping manually</summary>
@@ -352,6 +356,6 @@
       <div class="modal-actions"><button id="confirmCancel" class="btn secondary">Cancel</button><button id="confirmOk" class="btn primary">Continue</button></div>
     </div>
   </div>
-  <script src="/static/app.js?v=impeccable-polish-14"></script>
+  <script src="/static/app.js?v=impeccable-polish-15"></script>
 </body>
 </html>

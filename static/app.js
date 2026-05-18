@@ -1,6 +1,6 @@
 const $ = (s) => document.querySelector(s);
 const $$ = (s) => [...document.querySelectorAll(s)];
-const state = { health:null, stats:null, settings:null, defaultNamespace:'', selectedNamespace:'__all__', view:'overview', memoryOffset:0, selectedMemory:null, recentWrites:[], identityScope:null };
+const state = { health:null, stats:null, settings:null, defaultNamespace:'', selectedNamespace:'__all__', view:'overview', memoryOffset:0, selectedMemory:null, recentWrites:[], identityScope:null, actorIdentityFilter:'__all__' };
 const VALID_VIEWS = new Set(['overview','visualiser','memories','recall','conflicts','graph','identity-scope','lifecycle','ops','settings']);
 const ALL_NAMESPACES = '__all__';
 const DEFAULT_VIZ_CAMERA = { rotation:.55, tilt:.78, zoom:1, panX:0, panY:0 };
@@ -228,7 +228,8 @@ function renderScopeRows(items, kind){
       pieces.push(chip('Platform', item.platform), chip('Actor ID', item.actor_id));
       if(item.alias) pieces.push(chip('Known alias', item.alias));
       detail = `<details class="scope-technical"><summary>Technical details</summary>${item.legacy_scope?`<div><span>Namespace</span><code>${esc(item.legacy_scope)}</code></div>`:''}${item.source?`<div><span>Source</span><code>${esc(sourceLabel(item))}</code></div>`:''}</details>`;
-      actions = `<div class="inline-identity-control"><span>Identity</span>${identitySelectMarkup(item.identity, raw)}<button class="btn tiny primary" type="button" data-save-actor-identity="${esc(raw)}">Save</button></div>`;
+      actions = `<div class="inline-identity-control"><span>Identity</span><div class="inline-identity-actions">${identitySelectMarkup(item.identity, raw)}<button class="btn tiny primary" type="button" data-save-actor-identity="${esc(raw)}">Save</button></div></div>`;
+      return `<div class="scope-card actor-row"><div class="actor-main"><strong>${esc(title)}</strong><div class="scope-chip-row">${pieces.join('')}</div>${detail}</div>${actions}</div>`;
     }
     if(kind==='spaces'){
       pieces.push(chip('Space', item.id), chip('Members', Array.isArray(item.members)?item.members.join(', '):(item.members||'')));
@@ -239,8 +240,7 @@ function renderScopeRows(items, kind){
       pieces.push(chip('Platform', item.platform), chip('Conversation', item.conversation_id), chip('Routes to', item.scope));
       actions = `<button class="btn tiny secondary" type="button" data-edit-conversation="${esc((item.platform||'')+':'+(item.conversation_id||''))}">Edit route</button>`;
     }
-    const actorClass = kind==='actors' ? ' actor-card' : '';
-    return `<div class="scope-card${actorClass}"><div class="scope-card-head"><strong>${esc(title)}</strong>${actions}</div><div class="scope-chip-row">${pieces.join('')}</div>${detail}</div>`;
+    return `<div class="scope-card"><div class="scope-card-head"><strong>${esc(title)}</strong>${actions}</div><div class="scope-chip-row">${pieces.join('')}</div>${detail}</div>`;
   }).join('');
 }
 function bindIdentityScopeRowActions(){
@@ -275,6 +275,28 @@ function availableScopeOptions(cfg){
   (cfg.spaces||[]).forEach(s=>{ if(s.scope) scopes.push(s.scope); });
   return [...new Set(scopes)].filter(Boolean);
 }
+function actorIdentityFilterOptions(cfg){
+  const ids=availableIdentityOptions(cfg).filter(Boolean);
+  const hasUnassigned=(cfg.actors||[]).some(a=>!a.identity);
+  const opts=[{value:'__all__', label:'All'}];
+  ids.forEach(id=>opts.push({value:id, label:id}));
+  if(hasUnassigned) opts.push({value:'__unassigned__', label:'Unassigned'});
+  return opts;
+}
+function renderActorIdentityFilter(cfg){
+  const sel=$('#actorIdentityFilter'); if(!sel) return;
+  const opts=actorIdentityFilterOptions(cfg);
+  if(!opts.some(o=>o.value===state.actorIdentityFilter)) state.actorIdentityFilter='__all__';
+  sel.innerHTML=opts.map(o=>`<option value="${esc(o.value)}" ${o.value===state.actorIdentityFilter?'selected':''}>${esc(o.label)}</option>`).join('');
+  sel.onchange=()=>{ state.actorIdentityFilter=sel.value || '__all__'; renderIdentityScope(state.identityScope); };
+}
+function filteredActors(cfg){
+  const actors=cfg.actors||[];
+  if(state.actorIdentityFilter==='__unassigned__') return actors.filter(a=>!a.identity);
+  if(state.actorIdentityFilter && state.actorIdentityFilter!=='__all__') return actors.filter(a=>a.identity===state.actorIdentityFilter);
+  return actors;
+}
+
 function renderIdentityScopeSelectors(cfg){
   const actorSel=$('#actorIdentity');
   if(actorSel){
@@ -362,7 +384,8 @@ function renderIdentityScope(data){
   const cfg=data.identity_scope||{}; const summary=data.summary||{};
   $('#identityScopeSummary').innerHTML=[['Identities',summary.identities],['Actors',summary.actors],['Shared scopes',summary.spaces],['Routes',summary.conversations],['Unmapped',summary.unmapped_namespaces]].map(([k,v])=>`<div class="metric"><div class="metric-label">${esc(k)}</div><div class="metric-value">${esc(fmt(v||0))}</div></div>`).join('');
   $('#identityList').innerHTML=renderScopeRows(cfg.identities,'identities');
-  $('#actorList').innerHTML=renderScopeRows(cfg.actors,'actors');
+  renderActorIdentityFilter(cfg);
+  $('#actorList').innerHTML=renderScopeRows(filteredActors(cfg),'actors');
   $('#spaceList').innerHTML=renderScopeRows(cfg.spaces,'spaces');
   $('#conversationList').innerHTML=renderScopeRows(cfg.conversations,'conversations');
   $('#identityNamespaceTable').innerHTML=`<table><thead><tr><th>Namespace</th><th>Rows</th><th>Belongs to</th><th>Status</th></tr></thead><tbody>${(data.namespace_inventory||[]).map(n=>`<tr><td><code>${esc(n.namespace)}</code></td><td>${fmt(n.count)}</td><td>${n.mapped?`<div class="mapped-owner"><strong>${esc(n.mapped_to || 'Mapped')}</strong><span>${esc((n.mapping_type || '').replace('_',' '))}</span></div>`:'<span class="muted">No person or space yet</span>'}</td><td><span class="pill ${n.mapped?'neutral':'warn'}">${n.mapped?'Mapped':'Needs review'}</span></td></tr>`).join('') || '<tr><td colspan="4">No namespaces found.</td></tr>'}</tbody></table>`;
