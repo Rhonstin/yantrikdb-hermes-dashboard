@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>YantrikDB Dashboard</title>
   <link rel="icon" href="/static/assets/favicon.svg?v=yantrikdb-white-favicon-2" type="image/svg+xml">
-  <link rel="stylesheet" href="/static/styles.css?v=impeccable-polish-2" />
+  <link rel="stylesheet" href="/static/styles.css?v=impeccable-polish-3" />
 </head>
 <body>
   <div class="grain"></div>
@@ -48,8 +48,8 @@
       <div>
         <h1 id="pageTitle">Memory Operations</h1>
         <div id="scopeBar" class="scope-bar" aria-live="polite">
-          <span class="scope-kicker">Memory scope</span>
-          <strong id="scopeName">Loading…</strong>
+          <label class="scope-kicker" for="scopeSelect">Memory scope</label>
+          <select id="scopeSelect" aria-label="Memory scope"></select>
           <span id="scopeCount" class="scope-count"></span>
         </div>
       </div>
@@ -219,7 +219,7 @@
           <div class="setting-list">
             <label class="setting-row switch-row">
               <span><strong>Admin Mode</strong><small>Allow memory-changing actions such as maintenance, conflict resolution, and forgetting memories.</small></span>
-              <input id="adminModeToggle" type="checkbox" />
+              <span class="switch-control-wrap"><input id="adminModeToggle" type="checkbox" /><span class="switch-control" aria-hidden="true"></span></span>
             </label>
             <div class="setting-row password-row">
               <div><strong>Dashboard password</strong><small id="passwordState">Password disabled</small></div>
@@ -275,6 +275,6 @@
       <div class="modal-actions"><button id="confirmCancel" class="btn secondary">Cancel</button><button id="confirmOk" class="btn primary">Continue</button></div>
     </div>
   </div>
-  <script src="/static/app.js?v=impeccable-polish-2"></script>
+  <script src="/static/app.js?v=impeccable-polish-3"></script>
 </body>
 </html>

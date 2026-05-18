@@ -18,8 +18,8 @@ async function api(path, opts={}){
   if(!res.ok) throw new Error(data.detail || data.error || res.statusText);
   return data;
 }
-function ns(){ return $('#memoryNamespaceFilter')?.value || $('#namespaceSelect')?.value || state.namespace; }
-function setNamespace(value){ const v=value || state.namespace; if($('#namespaceSelect')) $('#namespaceSelect').value=v; if($('#memoryNamespaceFilter')) $('#memoryNamespaceFilter').value=v; }
+function ns(){ return $('#scopeSelect')?.value || $('#memoryNamespaceFilter')?.value || $('#namespaceSelect')?.value || ALL_NAMESPACES; }
+function setNamespace(value){ const v=value || ALL_NAMESPACES; if($('#scopeSelect')) $('#scopeSelect').value=v; if($('#namespaceSelect')) $('#namespaceSelect').value=v; if($('#memoryNamespaceFilter')) $('#memoryNamespaceFilter').value=v; }
 function syncMemoryFiltersFromUrl(params=new URLSearchParams(location.search)){
   if(params.has('q')) $('#memorySearch').value=params.get('q')||'';
   if(params.has('status')) $('#statusFilter').value=params.get('status')||'active';
@@ -33,7 +33,7 @@ function routeUrlFor(view){
   ['q','status','domain','source','sort'].forEach(k=>url.searchParams.delete(k));
   if(view==='memories'){
     const vals={namespace:ns(),q:$('#memorySearch')?.value||'',status:$('#statusFilter')?.value||'active',domain:$('#domainFilter')?.value||'',source:$('#sourceFilter')?.value||'',sort:$('#sortFilter')?.value||'created_at'};
-    for(const [k,v] of Object.entries(vals)) if(v && !(['status','sort','namespace'].includes(k) && ['active','created_at',state.namespace].includes(v))) url.searchParams.set(k,v);
+    for(const [k,v] of Object.entries(vals)) if(v && !(['status','sort','namespace'].includes(k) && ['active','created_at',ALL_NAMESPACES].includes(v))) url.searchParams.set(k,v);
   }
   return url;
 }
@@ -87,6 +87,7 @@ async function init(){
   document.addEventListener('keydown',(e)=>{ if(e.key==='Escape'){ document.body.classList.remove('menu-open'); $('#menuToggle')?.setAttribute('aria-expanded','false'); closeMemoryDetail({silent:true}); } });
   $('#closeMemoryDrawer')?.addEventListener('click',()=>closeMemoryDetail());
   $('#memoryDrawer')?.addEventListener('click',(e)=>{ if(e.target.id==='memoryDrawer') closeMemoryDetail(); });
+  $('#scopeSelect')?.addEventListener('change',()=>{ setNamespace($('#scopeSelect').value); state.memoryOffset=0; writeRoute(state.view,{replace:true}); refreshAll(); });
   $('#namespaceSelect').onchange=()=>{ setNamespace($('#namespaceSelect').value); refreshAll(); };
   $('#memoryNamespaceFilter')?.addEventListener('change',()=>{ setNamespace($('#memoryNamespaceFilter').value); state.memoryOffset=0; writeRoute('memories',{replace:true}); refreshAll(); });
   $('#memoryApply').onclick=()=>{state.memoryOffset=0; writeRoute('memories',{replace:true}); loadMemories();};
@@ -125,7 +126,6 @@ function selectedNamespaceMeta(){
 function updateScopeUi(){
   const meta=selectedNamespaceMeta();
   const count=meta.count===null?'':`${fmt(meta.count)} memor${Number(meta.count)===1?'y':'ies'}`;
-  $('#scopeName') && ($('#scopeName').textContent=meta.name);
   $('#scopeCount') && ($('#scopeCount').textContent=count);
   $('#scopeBar')?.classList.toggle('all-scope', !!meta.all);
   $('#opsScopeName') && ($('#opsScopeName').textContent=meta.name);
@@ -140,8 +140,10 @@ async function refreshAll(){
   state.namespace=state.health.default_namespace;
   const nsRows=state.health.namespaces||[];
   const options=`<option value="${ALL_NAMESPACES}">All namespaces (${fmt(nsRows.reduce((a,n)=>a+Number(n.count||0),0))})</option>`+nsRows.map(n=>`<option value="${esc(n.namespace)}">${esc(n.namespace)} (${fmt(n.count)})</option>`).join('');
-  const sel=$('#namespaceSelect'); const memSel=$('#memoryNamespaceFilter'); const prev=(memSel?.value || sel?.value || state.namespace);
-  [sel,memSel].filter(Boolean).forEach(s=>{
+  const sel=$('#namespaceSelect'); const memSel=$('#memoryNamespaceFilter'); const scopeSel=$('#scopeSelect');
+  const requested=new URLSearchParams(location.search).get('namespace');
+  const prev=(requested || scopeSel?.value || memSel?.value || sel?.value || ALL_NAMESPACES);
+  [sel,memSel,scopeSel].filter(Boolean).forEach(s=>{
     s.innerHTML=options;
     if(![...s.options].some(o=>o.value===prev)) s.insertAdjacentHTML('afterbegin',`<option value="${esc(prev)}">${esc(prev)}</option>`);
     s.value=prev;
@@ -217,18 +219,48 @@ async function loadStats(){
 function humanBytes(b){ if(!b) return '0 B'; const u=['B','KB','MB','GB']; let i=0; while(b>1024&&i<u.length-1){b/=1024;i++;} return `${b.toFixed(i?1:0)} ${u[i]}`; }
 function metric(label,value){return `<div class="metric"><div class="metric-label">${esc(label)}</div><div class="metric-value">${esc(fmt(value))}</div></div>`}
 function compositionBlock(title, arr){ const max=Math.max(1,...(arr||[]).map(x=>x.count)); return `<div class="detail-section"><div class="label">${title}</div>${(arr||[]).slice(0,8).map(x=>`<div class="bar-row"><span>${esc(x.domain||x.source||x.type||'—')}</span><div class="bar"><span style="width:${(x.count/max)*100}%"></span></div><b>${fmt(x.count)}</b></div>`).join('')}</div>`; }
+function formatShortDate(day){
+  const date=new Date(`${day}T00:00:00`);
+  if(Number.isNaN(date.getTime())) return String(day||'').slice(5);
+  return date.toLocaleDateString(undefined,{month:'short',day:'numeric'});
+}
 function drawRecent(data){
   const c=$('#recentChart'); if(!c) return;
   const rect=c.getBoundingClientRect();
   const cssW=Math.max(1, Math.floor(rect.width || c.parentElement?.clientWidth || 320));
-  const cssH=170;
+  const cssH=210;
   const dpr=Math.min(devicePixelRatio||1,2);
   c.style.width='100%'; c.style.height=`${cssH}px`;
   c.width=Math.floor(cssW*dpr); c.height=Math.floor(cssH*dpr);
   const ctx=c.getContext('2d'); ctx.setTransform(dpr,0,0,dpr,0,0); ctx.clearRect(0,0,cssW,cssH);
-  const max=Math.max(1,...data.map(d=>d.count));
-  const pad=18, gap=Math.max(3, Math.min(8, cssW/80)), bw=(cssW-pad*2)/Math.max(1,data.length);
-  data.forEach((d,i)=>{const x=pad+i*bw+gap/2, bh=(cssH-pad*2)*(d.count/max); const y=cssH-pad-bh; const g=ctx.createLinearGradient(0,y,0,cssH-pad); g.addColorStop(0,'#e94560'); g.addColorStop(1,'#ffa500'); ctx.fillStyle=g; ctx.fillRect(x,y,Math.max(2,bw-gap),bh);});
+  ctx.font='12px system-ui, -apple-system, BlinkMacSystemFont, sans-serif';
+  const chart=data||[];
+  if(!chart.length){
+    ctx.fillStyle='rgba(255,247,249,.52)';
+    ctx.textAlign='center';
+    ctx.fillText('No recent writes in this scope', cssW/2, cssH/2);
+    return;
+  }
+  const max=Math.max(1,...chart.map(d=>Number(d.count)||0));
+  const left=38, right=12, top=18, bottom=42;
+  const w=cssW-left-right, h=cssH-top-bottom;
+  ctx.strokeStyle='rgba(255,255,255,.12)'; ctx.lineWidth=1;
+  ctx.beginPath(); ctx.moveTo(left,top); ctx.lineTo(left,top+h); ctx.lineTo(left+w,top+h); ctx.stroke();
+  ctx.fillStyle='rgba(255,247,249,.52)'; ctx.textAlign='right'; ctx.textBaseline='middle';
+  [0,.5,1].forEach(t=>{ const y=top+h-(h*t); const v=Math.round(max*t); ctx.fillText(String(v), left-8, y); ctx.strokeStyle='rgba(255,255,255,.055)'; ctx.beginPath(); ctx.moveTo(left,y); ctx.lineTo(left+w,y); ctx.stroke(); });
+  const gap=Math.max(2, Math.min(7, w/90));
+  const bw=w/Math.max(1,chart.length);
+  chart.forEach((d,i)=>{
+    const value=Number(d.count)||0;
+    const x=left+i*bw+gap/2;
+    const bh=Math.max(value?3:0, h*(value/max));
+    const y=top+h-bh;
+    const g=ctx.createLinearGradient(0,y,0,top+h); g.addColorStop(0,'#e94560'); g.addColorStop(1,'#ffa500');
+    ctx.fillStyle=g; ctx.beginPath(); ctx.roundRect(x,y,Math.max(2,bw-gap),bh,4); ctx.fill();
+  });
+  const labelEvery=cssW<520?Math.ceil(chart.length/4):Math.ceil(chart.length/6);
+  ctx.fillStyle='rgba(255,247,249,.58)'; ctx.textAlign='center'; ctx.textBaseline='top';
+  chart.forEach((d,i)=>{ if(i===0 || i===chart.length-1 || i%labelEvery===0){ const x=left+i*bw+bw/2; ctx.fillText(formatShortDate(d.day), x, top+h+12); } });
 }
 
 function visualiserColors(){ return viz.mode==='neural' ? {bg:'#050915',core:'rgba(24,130,112,.30)',mid:'rgba(9,14,28,.96)',star:'#66e8c6',memory:'#ff9b6a',text:'#f7f8ff',edge:'rgba(102,232,198,.36)',memoryEdge:'rgba(255,155,106,.44)'} : {bg:'#050711',core:'rgba(233,69,96,.18)',mid:'rgba(9,10,18,.96)',star:'#ffd6dd',memory:'#ffa500',text:'#f7f8ff',edge:'rgba(255,214,221,.30)',memoryEdge:'rgba(255,165,0,.42)'}; }
