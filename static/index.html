@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>YantrikDB Dashboard</title>
   <link rel="icon" href="/static/assets/favicon.svg?v=yantrikdb-white-favicon-2" type="image/svg+xml">
-  <link rel="stylesheet" href="/static/styles.css?v=impeccable-polish-8" />
+  <link rel="stylesheet" href="/static/styles.css?v=impeccable-polish-9" />
 </head>
 <body>
   <div class="grain"></div>
@@ -54,14 +54,15 @@
 
     <section id="view-overview" class="view active">
       <div class="grid stats" id="statsGrid"></div>
-      <div class="two-col">
+      <div class="two-col overview-panels">
         <div class="panel">
           <div class="panel-head"><h2>Memory composition</h2><span class="muted">domain/source/type</span></div>
           <div id="composition"></div>
         </div>
-        <div class="panel">
+        <div class="panel recent-panel">
           <div class="panel-head"><h2>Recent writes</h2><span class="muted">last 30 days</span></div>
-          <canvas id="recentChart" height="170"></canvas>
+          <canvas id="recentChart" height="190"></canvas>
+          <div id="recentSummary" class="recent-summary" aria-label="Recent write summary"></div>
         </div>
       </div>
       <div class="panel">
@@ -275,6 +276,6 @@
       <div class="modal-actions"><button id="confirmCancel" class="btn secondary">Cancel</button><button id="confirmOk" class="btn primary">Continue</button></div>
     </div>
   </div>
-  <script src="/static/app.js?v=impeccable-polish-8"></script>
+  <script src="/static/app.js?v=impeccable-polish-9"></script>
 </body>
 </html>

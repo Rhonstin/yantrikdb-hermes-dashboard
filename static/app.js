@@ -1,6 +1,6 @@
 const $ = (s) => document.querySelector(s);
 const $$ = (s) => [...document.querySelectorAll(s)];
-const state = { health:null, stats:null, settings:null, defaultNamespace:'', selectedNamespace:'__all__', view:'overview', memoryOffset:0, selectedMemory:null };
+const state = { health:null, stats:null, settings:null, defaultNamespace:'', selectedNamespace:'__all__', view:'overview', memoryOffset:0, selectedMemory:null, recentWrites:[] };
 const VALID_VIEWS = new Set(['overview','visualiser','memories','recall','conflicts','graph','lifecycle','ops','settings']);
 const ALL_NAMESPACES = '__all__';
 const DEFAULT_VIZ_CAMERA = { rotation:.55, tilt:.78, zoom:1, panX:0, panY:0 };
@@ -84,6 +84,8 @@ function setView(view, opts={}){
   $('#pageTitle').textContent=names[view]||view;
   if(view!=='visualiser') stopVisualiser();
   if(view!=='memories') closeMemoryDetail({silent:true});
+  if(view==='overview' && state.stats) requestAnimationFrame(()=>drawRecent(state.recentWrites||[]));
+  if(view==='overview' && !state.stats) loadStats();
   if(view==='visualiser') loadVisualiser();
   if(view==='memories') loadMemories(); if(view==='recall' && !$('#recallQuery').value) $('#recallQuery').value='What should this agent remember about YantrikDB dashboards?';
   if(view==='conflicts') loadConflicts(); if(view==='graph') loadEntities(); if(view==='lifecycle') loadLifecycle(); if(view==='ops') loadHealthPanel(); if(view==='settings') loadSettings();
@@ -129,6 +131,7 @@ async function init(){
   $('#logoutBtn')?.addEventListener('click',logout);
   $('#loginBtn')?.addEventListener('click',login);
   $('#loginPassword')?.addEventListener('keydown',(e)=>{ if(e.key==='Enter') login(); });
+  window.addEventListener('resize',()=>{ if(state.view==='overview' && state.recentWrites) requestAnimationFrame(()=>drawRecent(state.recentWrites)); });
   try{ await refreshAll(); }catch(e){ toast(e.message); return; }
   const initialView = new URLSearchParams(location.search).get('view') || 'overview';
   setView(initialView,{replace:true,fromUrl:true});
@@ -242,7 +245,8 @@ async function loadStats(){
   if($('#heroMetrics')) $('#heroMetrics').innerHTML=metrics.slice(0,4).map(m=>metric(m[0],m[1])).join('');
   $('#statsGrid').innerHTML=metrics.map(m=>`<div class="stat-card"><div class="stat-label">${esc(m[0])}</div><div class="stat-value">${esc(fmt(m[1]))}</div></div>`).join('');
   $('#composition').innerHTML=compositionBlock('Domains',state.stats.by_domain)+compositionBlock('Sources',state.stats.by_source)+compositionBlock('Types',state.stats.by_type);
-  drawRecent(state.stats.recent_by_day||[]);
+  state.recentWrites=state.stats.recent_by_day||[];
+  drawRecent(state.recentWrites);
   $('#namespaceTable').innerHTML=`<table><thead><tr><th>Memory scope</th><th>Rows</th></tr></thead><tbody>${(state.health.namespaces||[]).map(n=>`<tr><td><code>${esc(n.namespace)}</code></td><td>${fmt(n.count)}</td></tr>`).join('')}</tbody></table>`;
   updateScopeUi();
 }
@@ -255,17 +259,33 @@ function formatShortDate(day){
   if(Number.isNaN(date.getTime())) return String(day||'').slice(5);
   return date.toLocaleDateString(undefined,{month:'short',day:'numeric'});
 }
+function recentSummaryBlock(chart){
+  const total=chart.reduce((a,d)=>a+(Number(d.count)||0),0);
+  const activeDays=chart.filter(d=>(Number(d.count)||0)>0).length;
+  const peak=chart.reduce((best,d)=>(Number(d.count)||0)>(Number(best?.count)||0)?d:best, chart[0]||null);
+  const latest=[...chart].reverse().find(d=>(Number(d.count)||0)>0);
+  const avg=activeDays?Math.round(total/activeDays):0;
+  const cells=[
+    ['Total', fmt(total)],
+    ['Active days', `${fmt(activeDays)}/${fmt(chart.length||0)}`],
+    ['Peak day', peak?`${fmt(peak.count)} · ${formatShortDate(peak.day)}`:'—'],
+    ['Avg / active day', fmt(avg)],
+  ];
+  return cells.map(([k,v])=>`<div class="recent-mini"><span>${esc(k)}</span><strong title="${esc(v)}">${esc(v)}</strong></div>`).join('');
+}
 function drawRecent(data){
   const c=$('#recentChart'); if(!c) return;
+  const chart=(data||[]).filter(d=>d && d.day);
+  const summary=$('#recentSummary'); if(summary) summary.innerHTML=recentSummaryBlock(chart);
   const rect=c.getBoundingClientRect();
-  const cssW=Math.max(1, Math.floor(rect.width || c.parentElement?.clientWidth || 320));
-  const cssH=210;
+  const parentW=c.parentElement?.clientWidth || 0;
+  const cssW=Math.max(320, Math.floor(rect.width || parentW || 320));
+  const cssH=190;
   const dpr=Math.min(devicePixelRatio||1,2);
   c.style.width='100%'; c.style.height=`${cssH}px`;
   c.width=Math.floor(cssW*dpr); c.height=Math.floor(cssH*dpr);
   const ctx=c.getContext('2d'); ctx.setTransform(dpr,0,0,dpr,0,0); ctx.clearRect(0,0,cssW,cssH);
   ctx.font='12px system-ui, -apple-system, BlinkMacSystemFont, sans-serif';
-  const chart=data||[];
   if(!chart.length){
     ctx.fillStyle='rgba(255,247,249,.52)';
     ctx.textAlign='center';
@@ -273,12 +293,12 @@ function drawRecent(data){
     return;
   }
   const max=Math.max(1,...chart.map(d=>Number(d.count)||0));
-  const left=38, right=12, top=18, bottom=42;
+  const left=44, right=14, top=14, bottom=34;
   const w=cssW-left-right, h=cssH-top-bottom;
   ctx.strokeStyle='rgba(255,255,255,.12)'; ctx.lineWidth=1;
   ctx.beginPath(); ctx.moveTo(left,top); ctx.lineTo(left,top+h); ctx.lineTo(left+w,top+h); ctx.stroke();
   ctx.fillStyle='rgba(255,247,249,.52)'; ctx.textAlign='right'; ctx.textBaseline='middle';
-  [0,.5,1].forEach(t=>{ const y=top+h-(h*t); const v=Math.round(max*t); ctx.fillText(String(v), left-8, y); ctx.strokeStyle='rgba(255,255,255,.055)'; ctx.beginPath(); ctx.moveTo(left,y); ctx.lineTo(left+w,y); ctx.stroke(); });
+  [0,.5,1].forEach(t=>{ const y=top+h-(h*t); const v=Math.round(max*t); ctx.fillText(String(v), left-9, y); ctx.strokeStyle='rgba(255,255,255,.055)'; ctx.beginPath(); ctx.moveTo(left,y); ctx.lineTo(left+w,y); ctx.stroke(); });
   const gap=Math.max(2, Math.min(7, w/90));
   const bw=w/Math.max(1,chart.length);
   chart.forEach((d,i)=>{
@@ -291,7 +311,7 @@ function drawRecent(data){
   });
   const labelEvery=cssW<520?Math.ceil(chart.length/4):Math.ceil(chart.length/6);
   ctx.fillStyle='rgba(255,247,249,.58)'; ctx.textAlign='center'; ctx.textBaseline='top';
-  chart.forEach((d,i)=>{ if(i===0 || i===chart.length-1 || i%labelEvery===0){ const x=left+i*bw+bw/2; ctx.fillText(formatShortDate(d.day), x, top+h+12); } });
+  chart.forEach((d,i)=>{ if(i===0 || i===chart.length-1 || i%labelEvery===0){ const x=left+i*bw+bw/2; ctx.fillText(formatShortDate(d.day), x, top+h+10); } });
 }
 
 function visualiserColors(){ return viz.mode==='neural' ? {bg:'#050915',core:'rgba(24,130,112,.30)',mid:'rgba(9,14,28,.96)',star:'#66e8c6',memory:'#ff9b6a',text:'#f7f8ff',edge:'rgba(102,232,198,.36)',memoryEdge:'rgba(255,155,106,.44)'} : {bg:'#050711',core:'rgba(233,69,96,.18)',mid:'rgba(9,10,18,.96)',star:'#ffd6dd',memory:'#ffa500',text:'#f7f8ff',edge:'rgba(255,214,221,.30)',memoryEdge:'rgba(255,165,0,.42)'}; }
