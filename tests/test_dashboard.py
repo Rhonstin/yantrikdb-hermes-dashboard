@@ -146,10 +146,66 @@ def test_constellation_all_namespaces_builds_scope_hubs(tmp_path, monkeypatch):
     monkeypatch.setattr(dashboard, "DB_PATH", db_path)
     result = dashboard.constellation(namespace="__all__", limit=40)
     labels = {node["label"] for node in result["nodes"]}
-    assert "scope:ns:a" in labels
-    assert "scope:ns:b" in labels
+    categories = {node["category"] for node in result["nodes"]}
+    assert result["all_namespaces"] is True
+    assert "a" in labels
+    assert "b" in labels
+    assert categories >= {"a", "b"}
     assert any(edge["kind"] == "scope" for edge in result["edges"])
-    assert {cluster["label"] for cluster in result["clusters"]} >= {"Namespace"}
+    assert {cluster["label"] for cluster in result["clusters"]} >= {"a", "b"}
+
+
+def test_constellation_all_namespaces_does_not_merge_same_label_across_scopes(tmp_path, monkeypatch):
+    db_path = tmp_path / "yantrikdb.db"
+    import sqlite3
+
+    with sqlite3.connect(db_path) as conn:
+        conn.execute("""
+            CREATE TABLE memories (
+                rid TEXT PRIMARY KEY, text TEXT, domain TEXT, source TEXT, type TEXT,
+                importance REAL, created_at REAL, updated_at REAL, access_count INTEGER,
+                consolidation_status TEXT, namespace TEXT
+            )
+        """)
+        conn.executemany(
+            "INSERT INTO memories VALUES (?,?,?,?,?,?,?,?,?,?,?)",
+            [
+                ("rid-alpha-0001", "Shared Topic appears here", "shared", "user", "semantic", .9, 3, 3, 0, "active", "ns:a"),
+                ("rid-beta-0002", "Shared Topic appears there", "shared", "user", "semantic", .8, 2, 2, 0, "active", "ns:b"),
+            ],
+        )
+
+    monkeypatch.setattr(dashboard, "DB_PATH", db_path)
+    result = dashboard.constellation(namespace="__all__", limit=80)
+    shared_nodes = [node for node in result["nodes"] if node["label"] == "shared"]
+    assert len(shared_nodes) == 2
+    assert {node["namespace"] for node in shared_nodes} == {"ns:a", "ns:b"}
+
+
+def test_constellation_all_namespaces_balances_scope_sampling(tmp_path, monkeypatch):
+    db_path = tmp_path / "yantrikdb.db"
+    import sqlite3
+
+    with sqlite3.connect(db_path) as conn:
+        conn.execute("""
+            CREATE TABLE memories (
+                rid TEXT PRIMARY KEY, text TEXT, domain TEXT, source TEXT, type TEXT,
+                importance REAL, created_at REAL, updated_at REAL, access_count INTEGER,
+                consolidation_status TEXT, namespace TEXT
+            )
+        """)
+        rows = []
+        for i in range(70):
+            rows.append((f"big-{i:03d}", f"Big namespace memory {i}", "shared", "user", "semantic", 1.0, 1000 - i, 1000 - i, 0, "active", "ns:big"))
+        for i in range(5):
+            rows.append((f"small-{i:03d}", f"Small namespace memory {i}", "shared", "user", "semantic", .2, 10 - i, 10 - i, 0, "active", "ns:small"))
+        conn.executemany("INSERT INTO memories VALUES (?,?,?,?,?,?,?,?,?,?,?)", rows)
+
+    monkeypatch.setattr(dashboard, "DB_PATH", db_path)
+    result = dashboard.constellation(namespace="__all__", limit=40)
+    namespaces = {node["namespace"] for node in result["nodes"] if node.get("namespace")}
+    assert {"ns:big", "ns:small"} <= namespaces
+    assert any(edge.get("item", {}).get("namespace") == "ns:small" for edge in result["edges"])
 
 
 def test_index_has_memory_namespace_filter_and_maintenance_label():

@@ -14,7 +14,7 @@ import re
 import secrets
 import sqlite3
 import time
-from collections import Counter
+from collections import Counter, defaultdict
 from pathlib import Path
 from typing import Any, Optional
 
@@ -713,23 +713,74 @@ def constellation(namespace: str = Query(DEFAULT_NAMESPACE), limit: int = Query(
     clauses.append("consolidation_status IN ('active','consolidated')")
     where_sql = " AND ".join(clauses)
     memory_limit = min(limit, 320 if is_all_namespaces(namespace) else 180)
-    memories = [clean_row(m) for m in rows(
-        f"""
-        SELECT rid,text,domain,source,type,importance,created_at,updated_at,access_count,consolidation_status,namespace
-        FROM memories
-        WHERE {where_sql}
-        ORDER BY importance DESC, created_at DESC
-        LIMIT ?
-        """,
-        (*params, memory_limit),
-    )]
-    nodes_by_label: dict[str, dict[str, Any]] = {}
+    if is_all_namespaces(namespace):
+        scope_rows = rows(
+            f"""
+            SELECT namespace, COUNT(*) AS count
+            FROM memories
+            WHERE {where_sql}
+            GROUP BY namespace
+            ORDER BY count DESC
+            LIMIT 12
+            """,
+            tuple(params),
+        )
+        scope_values = [str(r.get("namespace") or "") for r in scope_rows if r.get("namespace")]
+        per_scope = max(24, min(90, memory_limit // max(1, len(scope_values))))
+        raw_memories: list[dict[str, Any]] = []
+        for scope in scope_values:
+            raw_memories.extend(rows(
+                """
+                SELECT rid,text,domain,source,type,importance,created_at,updated_at,access_count,consolidation_status,namespace
+                FROM memories
+                WHERE namespace=? AND consolidation_status IN ('active','consolidated')
+                ORDER BY importance DESC, created_at DESC
+                LIMIT ?
+                """,
+                (scope, per_scope),
+            ))
+        memories = [clean_row(m) for m in raw_memories[:memory_limit]]
+    else:
+        memories = [clean_row(m) for m in rows(
+            f"""
+            SELECT rid,text,domain,source,type,importance,created_at,updated_at,access_count,consolidation_status,namespace
+            FROM memories
+            WHERE {where_sql}
+            ORDER BY importance DESC, created_at DESC
+            LIMIT ?
+            """,
+            (*params, memory_limit),
+        )]
+    all_scope = is_all_namespaces(namespace)
+    nodes_by_key: dict[str, dict[str, Any]] = {}
     edges: list[dict[str, Any]] = []
 
-    def touch(label: str, kind: str = "entity", weight: float = 1.0, category: str = "Other", rid: str = "", preview: str = "") -> dict[str, Any]:
+    def scope_label(value: str) -> str:
+        value = str(value or "unknown scope")
+        if ":owner:" in value:
+            return "owner:" + value.rsplit(":owner:", 1)[-1]
+        return value.rsplit(":", 1)[-1] if ":" in value else value
+
+    def touch(
+        label: str,
+        kind: str = "entity",
+        weight: float = 1.0,
+        category: str = "Other",
+        rid: str = "",
+        preview: str = "",
+        scope: str = "",
+        semantic_category: str = "",
+    ) -> dict[str, Any]:
         label = str(label or "unknown").strip()[:80] or "unknown"
-        node = nodes_by_label.setdefault(label, {
-            "id": f"n{len(nodes_by_label)+1}", "label": label, "kind": kind, "category": category,
+        scope = str(scope or "")
+        # In All namespaces mode, namespace is part of node identity. Otherwise
+        # shared labels like "user" or "general" collapse every namespace into
+        # one graph, which hides the separate memory scopes.
+        key = f"{scope}::{kind}::{label}" if all_scope and kind != "namespace" else f"{kind}::{label}"
+        node = nodes_by_key.setdefault(key, {
+            "id": f"n{len(nodes_by_key)+1}", "label": label, "kind": kind, "category": category,
+            "namespace": scope or None, "scope_label": scope_label(scope) if scope else None,
+            "semantic_category": semantic_category or category,
             "weight": 0.0, "count": 0, "memory_id": rid, "preview": preview,
         })
         node["weight"] = round(float(node.get("weight") or 0) + max(0.1, float(weight or 0.1)), 3)
@@ -744,13 +795,14 @@ def constellation(namespace: str = Query(DEFAULT_NAMESPACE), limit: int = Query(
     for m in memories:
         text = str(m.get("text") or "")
         rid = str(m.get("rid") or "")
-        category = _category_for_text(" ".join([text, str(m.get("domain") or ""), str(m.get("source") or "")]))
+        scope = str(m.get("namespace") or namespace or DEFAULT_NAMESPACE)
+        semantic_category = _category_for_text(" ".join([text, str(m.get("domain") or ""), str(m.get("source") or "")]))
+        graph_category = scope_label(scope) if all_scope else semantic_category
         importance = float(m.get("importance") or 0.35)
-        m_node = touch(f"memory:{rid[:8]}…{rid[-6:]}", kind="memory", weight=importance * 1.8, category=category, rid=rid, preview=text)
+        m_node = touch(f"memory:{rid[:8]}…{rid[-6:]}", kind="memory", weight=importance * 1.8, category=graph_category, rid=rid, preview=text, scope=scope, semantic_category=semantic_category)
         seeds = [m.get("domain"), m.get("source"), *_entity_terms(text, limit=4)]
-        if is_all_namespaces(namespace):
-            scope = str(m.get("namespace") or "unknown scope")
-            scope_node = touch(f"scope:{scope}", kind="namespace", weight=max(0.35, importance * 1.2), category="Namespace")
+        if all_scope:
+            scope_node = touch(scope_label(scope), kind="namespace", weight=max(0.35, importance * 1.2), category=graph_category, scope=scope, semantic_category="Namespace")
             edges.append({"id": f"e{len(edges)+1}", "source": scope_node["id"], "target": m_node["id"], "label": "contains", "kind": "scope", "item": {"rid": rid, "namespace": scope}})
         seen: set[str] = set()
         for raw in seeds:
@@ -758,14 +810,55 @@ def constellation(namespace: str = Query(DEFAULT_NAMESPACE), limit: int = Query(
             if not entity or entity.lower() in _STOP_TERMS or entity.lower() in seen:
                 continue
             seen.add(entity.lower())
-            e_node = touch(entity, kind="entity", weight=max(0.25, importance), category=category)
-            edges.append({"id": f"e{len(edges)+1}", "source": m_node["id"], "target": e_node["id"], "label": "mentions", "kind": "memory", "item": {"rid": rid, "entity": entity}})
+            e_node = touch(entity, kind="entity", weight=max(0.25, importance), category=graph_category, scope=scope, semantic_category=semantic_category)
+            edges.append({"id": f"e{len(edges)+1}", "source": m_node["id"], "target": e_node["id"], "label": "mentions", "kind": "memory", "item": {"rid": rid, "entity": entity, "namespace": scope}})
 
-    nodes = sorted(nodes_by_label.values(), key=lambda n: (float(n.get("weight") or 0), int(n.get("count") or 0)), reverse=True)[:limit]
+    ranked_nodes = sorted(nodes_by_key.values(), key=lambda n: (float(n.get("weight") or 0), int(n.get("count") or 0)), reverse=True)
+    if all_scope:
+        grouped: dict[str, list[dict[str, Any]]] = defaultdict(list)
+        for node in ranked_nodes:
+            grouped[str(node.get("category") or "Other")].append(node)
+        per_group = max(10, limit // max(1, len(grouped)))
+        selected: list[dict[str, Any]] = []
+        selected_ids: set[str] = set()
+        for group_nodes in grouped.values():
+            # Keep each namespace hub, then enough local nodes to make the subgraph visible.
+            group_pick = sorted(group_nodes, key=lambda n: (n.get("kind") == "namespace", float(n.get("weight") or 0), int(n.get("count") or 0)), reverse=True)[:per_group]
+            for node in group_pick:
+                if node["id"] not in selected_ids:
+                    selected.append(node); selected_ids.add(node["id"])
+        for node in ranked_nodes:
+            if len(selected) >= limit:
+                break
+            if node["id"] not in selected_ids:
+                selected.append(node); selected_ids.add(node["id"])
+        nodes = selected[:limit]
+    else:
+        nodes = ranked_nodes[:limit]
     kept = {n["id"] for n in nodes}
-    edges = [e for e in edges if e["source"] in kept and e["target"] in kept][:limit * 2]
+    kept_edges = [e for e in edges if e["source"] in kept and e["target"] in kept]
+    if all_scope:
+        grouped_edges: dict[str, list[dict[str, Any]]] = defaultdict(list)
+        for edge in kept_edges:
+            grouped_edges[str((edge.get("item") or {}).get("namespace") or "Other")].append(edge)
+        edge_limit = limit * 2
+        per_edge_group = max(8, edge_limit // max(1, len(grouped_edges)))
+        selected_edges: list[dict[str, Any]] = []
+        seen_edges: set[str] = set()
+        for group_edges in grouped_edges.values():
+            for edge in group_edges[:per_edge_group]:
+                if edge["id"] not in seen_edges:
+                    selected_edges.append(edge); seen_edges.add(edge["id"])
+        for edge in kept_edges:
+            if len(selected_edges) >= edge_limit:
+                break
+            if edge["id"] not in seen_edges:
+                selected_edges.append(edge); seen_edges.add(edge["id"])
+        edges = selected_edges[:edge_limit]
+    else:
+        edges = kept_edges[:limit * 2]
     clusters = Counter(str(n.get("category") or "Other") for n in nodes)
-    return {"read_only": True, "nodes": nodes, "edges": edges, "clusters": [{"label": k, "count": v} for k, v in clusters.most_common()]}
+    return {"read_only": True, "all_namespaces": all_scope, "nodes": nodes, "edges": edges, "clusters": [{"label": k, "count": v} for k, v in clusters.most_common()]}
 
 
 @app.get("/api/entities")
