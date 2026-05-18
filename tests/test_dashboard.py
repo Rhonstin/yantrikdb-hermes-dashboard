@@ -578,6 +578,12 @@ def test_mobile_scope_and_visualiser_toolbar_css_is_compact():
     assert ".scope-bar select" in css
     assert "appearance: none" in css
     assert "background-position: calc(100% - 15px) 50%" in css
-    assert ".visualiser-actions { @apply -mx-1 flex-nowrap overflow-x-auto" in css
+    assert ".visualiser-actions { @apply grid w-full grid-cols-3 gap-2; }" in css
     assert ".visualiser-toolbar .visualiser-actions .btn" in css
-    assert "scrollbar-width: none" in css
+    assert "whitespace-normal text-xs leading-5" in css
+
+
+def test_visualiser_fullscreen_mobile_label_is_short():
+    html = Path("static/index.html").read_text()
+    assert 'id="threeFullscreen" class="btn secondary" aria-label="Fullscreen">Full</button>' in html
+    assert "Drag to rotate · Pinch to zoom · Pan to move." in html

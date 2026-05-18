@@ -392,10 +392,9 @@
   .scope-count { @apply absolute right-4 top-3 px-2 py-0.5 text-[10px]; }
   .scope-loading { @apply w-fit; }
   .visualiser-toolbar { @apply flex flex-col gap-3 p-3; }
-  .visualiser-actions { @apply -mx-1 flex-nowrap overflow-x-auto px-1 pb-1; scrollbar-width: none; }
-  .visualiser-actions::-webkit-scrollbar { display: none; }
-  .visualiser-toolbar .visualiser-actions .btn { @apply w-auto flex-none rounded-full px-3 py-1.5 text-sm; min-height: 36px; }
-  .visualiser-toolbar .muted { @apply text-xs leading-5; }
+  .visualiser-actions { @apply grid w-full grid-cols-3 gap-2; }
+  .visualiser-toolbar .visualiser-actions .btn { @apply w-full rounded-full px-2 py-1.5 text-sm; min-height: 36px; }
+  .visualiser-toolbar .muted { @apply whitespace-normal text-xs leading-5; }
   .action-row .btn, .setting-row .btn { @apply w-full; }
   .switch-row { @apply grid-cols-[minmax(0,1fr)_auto]; }
   .switch-row .switch-control-wrap { @apply w-[56px]; }
