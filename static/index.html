@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>YantrikDB Dashboard</title>
   <link rel="icon" href="/static/assets/favicon.svg?v=yantrikdb-white-favicon-2" type="image/svg+xml">
-  <link rel="stylesheet" href="/static/styles.css?v=impeccable-polish-10" />
+  <link rel="stylesheet" href="/static/styles.css?v=impeccable-polish-11" />
 </head>
 <body>
   <div class="grain"></div>
@@ -181,18 +181,43 @@
       <div class="scope-grid">
         <div class="panel scope-panel">
           <div class="panel-head"><h2>Identities</h2><span class="muted">canonical people</span></div>
+          <form id="identityForm" class="scope-form" aria-label="Add identity">
+            <input id="identityId" placeholder="Identity ID, e.g. yc" autocomplete="off" />
+            <input id="identityLabel" placeholder="Label, e.g. Yuan Chin" autocomplete="off" />
+            <input id="identityPrivateScope" placeholder="Private scope, e.g. owner:yc" autocomplete="off" />
+            <button class="btn secondary" type="submit">Add identity</button>
+          </form>
           <div id="identityList" class="scope-list"></div>
         </div>
         <div class="panel scope-panel">
           <div class="panel-head"><h2>Actors</h2><span class="muted">platform IDs</span></div>
+          <form id="actorForm" class="scope-form" aria-label="Map actor to identity">
+            <input id="actorPlatform" placeholder="Platform, e.g. whatsapp" autocomplete="off" />
+            <input id="actorId" placeholder="Actor ID, e.g. 191...@lid" autocomplete="off" />
+            <select id="actorIdentity" aria-label="Actor identity"></select>
+            <button class="btn secondary" type="submit">Map actor</button>
+          </form>
           <div id="actorList" class="scope-list"></div>
         </div>
         <div class="panel scope-panel">
           <div class="panel-head"><h2>Shared scopes</h2><span class="muted">groups and spaces</span></div>
+          <form id="spaceForm" class="scope-form" aria-label="Add shared scope">
+            <input id="spaceId" placeholder="Scope ID, e.g. household" autocomplete="off" />
+            <input id="spaceLabel" placeholder="Label, e.g. Household" autocomplete="off" />
+            <input id="spaceScope" placeholder="Memory scope, e.g. space:household" autocomplete="off" />
+            <input id="spaceMembers" placeholder="Members, comma separated" autocomplete="off" />
+            <button class="btn secondary" type="submit">Add shared scope</button>
+          </form>
           <div id="spaceList" class="scope-list"></div>
         </div>
         <div class="panel scope-panel">
           <div class="panel-head"><h2>Conversation routing</h2><span class="muted">chat → memory scope</span></div>
+          <form id="conversationForm" class="scope-form" aria-label="Route conversation">
+            <input id="conversationPlatform" placeholder="Platform, e.g. whatsapp" autocomplete="off" />
+            <input id="conversationId" placeholder="Conversation/chat ID" autocomplete="off" />
+            <select id="conversationScope" aria-label="Conversation memory scope"></select>
+            <button class="btn secondary" type="submit">Route conversation</button>
+          </form>
           <div id="conversationList" class="scope-list"></div>
         </div>
       </div>
@@ -201,13 +226,16 @@
         <div id="identityNamespaceTable" class="table-wrap"></div>
       </div>
       <div class="panel advanced-panel">
-        <div class="panel-head"><h2>Advanced config</h2><span class="muted">JSON editor</span></div>
-        <p class="page-copy">Edit the registry as generic JSON. Saving requires Admin Mode and updates dashboard settings only.</p>
-        <textarea id="identityScopeJson" class="json-editor" spellcheck="false" aria-label="Identity and scope JSON"></textarea>
-        <div class="toolbar compact">
-          <button id="reloadIdentityScope" class="btn secondary">Reload</button>
-          <button id="saveIdentityScope" class="btn primary">Save registry</button>
-        </div>
+        <div class="panel-head"><h2>Advanced config</h2><span class="muted">optional JSON</span></div>
+        <p class="page-copy">Use the forms above for normal edits. This JSON is only for bulk review or advanced fixes. Saving requires Admin Mode.</p>
+        <details class="details-block">
+          <summary>Show raw registry JSON</summary>
+          <textarea id="identityScopeJson" class="json-editor" spellcheck="false" aria-label="Identity and scope JSON"></textarea>
+          <div class="toolbar compact">
+            <button id="reloadIdentityScope" class="btn secondary" type="button">Reload</button>
+            <button id="saveIdentityScope" class="btn primary" type="button">Save registry</button>
+          </div>
+        </details>
       </div>
     </section>
 
@@ -320,6 +348,6 @@
       <div class="modal-actions"><button id="confirmCancel" class="btn secondary">Cancel</button><button id="confirmOk" class="btn primary">Continue</button></div>
     </div>
   </div>
-  <script src="/static/app.js?v=impeccable-polish-10"></script>
+  <script src="/static/app.js?v=impeccable-polish-11"></script>
 </body>
 </html>

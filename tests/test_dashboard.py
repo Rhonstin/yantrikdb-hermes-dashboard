@@ -274,8 +274,16 @@ def test_index_has_identity_scope_page_contract():
     assert 'id="view-identity-scope"' in html
     assert 'id="identityScopeSummary"' in html
     assert 'id="identityScopeJson"' in html
+    assert 'id="identityForm"' in html
+    assert 'id="actorForm"' in html
+    assert 'id="spaceForm"' in html
+    assert 'id="conversationForm"' in html
     assert "identity-scope" in js
     assert "/api/identity-scope" in js
+    assert "addIdentityFromForm" in js
+    assert "addActorFromForm" in js
+    assert "addSpaceFromForm" in js
+    assert "addConversationFromForm" in js
 
 
 def test_identity_scope_api_imports_yantrikdb_identity_map(tmp_path, monkeypatch):

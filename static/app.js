@@ -126,6 +126,8 @@ async function init(){
   $$('.visualiser-tabs button[data-three-mode]').forEach(b=>b.onclick=()=>setVisualiserMode(b.dataset.threeMode));
   $('#loadEntities').onclick=loadEntities; $('#loadGraph').onclick=()=>loadGraph($('#graphEntity').value||$('#entitySearch').value);
   $('#reloadIdentityScope')?.addEventListener('click',()=>loadIdentityScope()); $('#saveIdentityScope')?.addEventListener('click',()=>saveIdentityScope());
+  $('#identityForm')?.addEventListener('submit', addIdentityFromForm); $('#actorForm')?.addEventListener('submit', addActorFromForm);
+  $('#spaceForm')?.addEventListener('submit', addSpaceFromForm); $('#conversationForm')?.addEventListener('submit', addConversationFromForm);
   $('#runThink').onclick=runThink; $('#refreshHealth').onclick=loadHealthPanel; $('#adminModeToggle')?.addEventListener('change',()=>saveSettings());
   $('#savePassword')?.addEventListener('click',()=>saveSettings({password:true}));
   $('#disablePassword')?.addEventListener('click',()=>saveSettings({disablePassword:true}));
@@ -214,6 +216,86 @@ function renderScopeRows(items, kind){
     return `<div class="scope-card"><strong>${esc(title)}</strong><div class="scope-chip-row">${pieces.join('')}</div></div>`;
   }).join('');
 }
+
+function identityConfig(){
+  const cfg=state.identityScope?.identity_scope || {};
+  return {
+    identities:[...(cfg.identities||[])],
+    actors:[...(cfg.actors||[])],
+    spaces:[...(cfg.spaces||[])],
+    conversations:[...(cfg.conversations||[])],
+  };
+}
+function cleanId(value){ return String(value||'').trim(); }
+function csvList(value){ return String(value||'').split(',').map(v=>v.trim()).filter(Boolean); }
+function upsertBy(list, item, keyFn){
+  const key=keyFn(item); const idx=list.findIndex(existing=>keyFn(existing)===key);
+  if(idx>=0) list[idx]={...list[idx],...item}; else list.push(item);
+}
+function availableIdentityOptions(cfg){
+  const ids=(cfg.identities||[]).map(i=>i.id).filter(Boolean);
+  return ids.length ? ids : [''];
+}
+function availableScopeOptions(cfg){
+  const scopes=[];
+  (cfg.identities||[]).forEach(i=>{ if(i.private_scope) scopes.push(i.private_scope); if(i.resolved_scope) scopes.push(i.resolved_scope); });
+  (cfg.spaces||[]).forEach(s=>{ if(s.scope) scopes.push(s.scope); });
+  return [...new Set(scopes)].filter(Boolean);
+}
+function renderIdentityScopeSelectors(cfg){
+  const actorSel=$('#actorIdentity');
+  if(actorSel){
+    const current=actorSel.value; const options=availableIdentityOptions(cfg);
+    actorSel.innerHTML=options.map(id=>`<option value="${esc(id)}">${esc(id || 'Choose identity')}</option>`).join('');
+    if(options.includes(current)) actorSel.value=current;
+  }
+  const scopeSel=$('#conversationScope');
+  if(scopeSel){
+    const current=scopeSel.value; const options=availableScopeOptions(cfg);
+    scopeSel.innerHTML=(options.length?options:['']).map(scope=>`<option value="${esc(scope)}">${esc(scope || 'Choose scope')}</option>`).join('');
+    if(options.includes(current)) scopeSel.value=current;
+  }
+}
+async function persistIdentityConfig(cfg, message='Identity & Scope registry saved'){
+  $('#identityScopeJson').value=compactJson(cfg);
+  const data=await api('/api/identity-scope',{method:'POST',body:JSON.stringify({identity_scope:cfg})});
+  renderIdentityScope(data); toast(message);
+}
+async function addIdentityFromForm(e){
+  e.preventDefault();
+  const id=cleanId($('#identityId')?.value);
+  if(!id){ toast('Enter an identity ID first'); return; }
+  const cfg=identityConfig();
+  const privateScope=cleanId($('#identityPrivateScope')?.value) || `owner:${id}`;
+  upsertBy(cfg.identities,{id,label:cleanId($('#identityLabel')?.value)||id,private_scope:privateScope}, item=>item.id);
+  try{ await persistIdentityConfig(cfg, 'Identity added'); e.target.reset(); }catch(err){ toast(err.message || 'Could not add identity'); }
+}
+async function addActorFromForm(e){
+  e.preventDefault();
+  const platform=cleanId($('#actorPlatform')?.value); const actor_id=cleanId($('#actorId')?.value); const identity=cleanId($('#actorIdentity')?.value);
+  if(!platform || !actor_id || !identity){ toast('Enter platform, actor ID, and identity'); return; }
+  const cfg=identityConfig();
+  upsertBy(cfg.actors,{platform,actor_id,identity}, item=>`${item.platform}:${item.actor_id}`);
+  try{ await persistIdentityConfig(cfg, 'Actor mapped'); e.target.reset(); renderIdentityScopeSelectors(cfg); }catch(err){ toast(err.message || 'Could not map actor'); }
+}
+async function addSpaceFromForm(e){
+  e.preventDefault();
+  const id=cleanId($('#spaceId')?.value);
+  if(!id){ toast('Enter a shared scope ID first'); return; }
+  const cfg=identityConfig();
+  const scope=cleanId($('#spaceScope')?.value) || `space:${id}`;
+  upsertBy(cfg.spaces,{id,label:cleanId($('#spaceLabel')?.value)||id,scope,members:csvList($('#spaceMembers')?.value)}, item=>item.id);
+  try{ await persistIdentityConfig(cfg, 'Shared scope added'); e.target.reset(); }catch(err){ toast(err.message || 'Could not add shared scope'); }
+}
+async function addConversationFromForm(e){
+  e.preventDefault();
+  const platform=cleanId($('#conversationPlatform')?.value); const conversation_id=cleanId($('#conversationId')?.value); const scope=cleanId($('#conversationScope')?.value);
+  if(!platform || !conversation_id || !scope){ toast('Enter platform, conversation ID, and scope'); return; }
+  const cfg=identityConfig();
+  upsertBy(cfg.conversations,{platform,conversation_id,scope}, item=>`${item.platform}:${item.conversation_id}`);
+  try{ await persistIdentityConfig(cfg, 'Conversation route saved'); e.target.reset(); renderIdentityScopeSelectors(cfg); }catch(err){ toast(err.message || 'Could not route conversation'); }
+}
+
 function renderIdentityScope(data){
   state.identityScope=data;
   const cfg=data.identity_scope||{}; const summary=data.summary||{};
@@ -224,7 +306,9 @@ function renderIdentityScope(data){
   $('#conversationList').innerHTML=renderScopeRows(cfg.conversations,'conversations');
   $('#identityNamespaceTable').innerHTML=`<table><thead><tr><th>Namespace</th><th>Rows</th><th>Mapped</th></tr></thead><tbody>${(data.namespace_inventory||[]).map(n=>`<tr><td><code>${esc(n.namespace)}</code></td><td>${fmt(n.count)}</td><td><span class="pill ${n.mapped?'neutral':'warn'}">${n.mapped?'Mapped':'Unmapped'}</span></td></tr>`).join('') || '<tr><td colspan="3">No namespaces found.</td></tr>'}</tbody></table>`;
   $('#identityScopeJson').value=compactJson(cfg);
+  renderIdentityScopeSelectors(cfg);
 }
+
 async function loadIdentityScope(){
   const data=await api('/api/identity-scope');
   renderIdentityScope(data);

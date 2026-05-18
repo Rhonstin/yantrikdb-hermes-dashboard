@@ -138,6 +138,9 @@
   .identity-summary { @apply grid grid-cols-2 gap-3 sm:grid-cols-3 xl:grid-cols-5; }
   .scope-grid { @apply grid min-w-0 grid-cols-1 gap-5 xl:grid-cols-2; }
   .scope-panel { @apply self-start; }
+  .scope-form { @apply mb-4 grid gap-2 rounded-2xl border border-white/10 bg-black/20 p-3 sm:grid-cols-2; }
+  .scope-form input, .scope-form select { @apply min-h-10 min-w-0 rounded-xl border border-white/10 bg-black/30 px-3 py-2 text-sm text-zinc-100 outline-none transition placeholder:text-zinc-600 focus:border-yan-hot/50 focus:ring-2 focus:ring-yan-hot/20; }
+  .scope-form button { @apply sm:col-span-2; }
   .scope-list { @apply grid gap-3; }
   .scope-card { @apply rounded-2xl border border-white/10 bg-white/[.035] p-4; }
   .scope-card > strong { @apply block break-words text-sm font-semibold text-white; }
