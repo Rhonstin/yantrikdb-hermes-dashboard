@@ -631,6 +631,13 @@ def test_visualiser_fullscreen_control_lives_in_viewport():
     css = Path("src/styles.css").read_text()
     js = Path("static/app.js").read_text()
     assert 'id="threeFullscreen" class="viewport-fullscreen" aria-label="Open visualiser fullscreen"' in html
+    assert "function threeRenderPixelRatio(viewport)" in js
+    assert "qualityBoost = fullscreen ? 1.45 : 1.35" in js
+    assert "renderer.setPixelRatio(threeRenderPixelRatio(viewport));" in js
+    assert "canvas.width = 256; canvas.height = 256;" in js
+    assert "canvas.width = 1024; canvas.height = 640;" in js
+    assert "precision:'highp'" in js
+    assert "text-rendering: geometricPrecision" in css
     assert html.index('id="threeFullscreen"') > html.index('id="threeViewport"')
     assert html.index('id="threeFullscreen"') < html.index('id="threeLabels"')
     assert 'id="threeFullscreen" class="btn secondary"' not in html

@@ -843,10 +843,22 @@ function colorForTheme(){
     light: c.light
   };
 }
+function threeRenderPixelRatio(viewport){
+  const rect = viewport?.getBoundingClientRect?.() || {width:650,height:650};
+  const base = Math.max(1, window.devicePixelRatio || 1);
+  const fullscreen = document.fullscreenElement === viewport || viewport?.matches?.(':fullscreen');
+  const mobile = rect.width < 520;
+  const qualityBoost = fullscreen ? 1.45 : 1.35;
+  const cap = fullscreen ? 3.5 : (mobile ? 2.75 : 3.25);
+  const maxPixels = fullscreen ? 12000000 : (mobile ? 3000000 : 6500000);
+  const areaCap = Math.sqrt(maxPixels / Math.max(1, rect.width * rect.height));
+  return Math.max(1, Math.min(base * qualityBoost, cap, areaCap));
+}
 function makePointTexture(THREE, kind){
   const canvas = document.createElement('canvas');
-  canvas.width = 128; canvas.height = 128;
+  canvas.width = 256; canvas.height = 256;
   const ctx = canvas.getContext('2d');
+  ctx.scale(2,2);
   const cx=64, cy=64;
   if(kind === 'star'){
     const g=ctx.createRadialGradient(cx,cy,0,cx,cy,60);
@@ -1017,8 +1029,8 @@ function neuralAuraOverlay(regions){
   return `<div class="three-aura-layer">${regionList.map((r,i)=>`<span class="three-aura-oval" data-region="${esc(r.label || '')}" style="opacity:0;transform:translate(-50%,-50%) rotate(${(Number(r.angle || 0) * 28).toFixed(1)}deg)"></span>`).join('')}</div>`;
 }
 function makeAuraOvalTexture(THREE){
-  const canvas = document.createElement('canvas'); canvas.width = 512; canvas.height = 320;
-  const ctx = canvas.getContext('2d'); const cx=256, cy=160;
+  const canvas = document.createElement('canvas'); canvas.width = 1024; canvas.height = 640;
+  const ctx = canvas.getContext('2d'); ctx.scale(2,2); const cx=256, cy=160;
   const g = ctx.createRadialGradient(cx, cy, 12, cx, cy, 230);
   g.addColorStop(0, 'rgba(102,232,198,.24)');
   g.addColorStop(.52, 'rgba(102,232,198,.13)');
@@ -1218,7 +1230,7 @@ async function renderThreeVisualiser(data){
   const colors = colorForTheme();
   let renderer;
   try {
-    renderer = new THREE.WebGLRenderer({ antialias:true, alpha:true, powerPreference:'high-performance' });
+    renderer = new THREE.WebGLRenderer({ antialias:true, alpha:true, powerPreference:'high-performance', precision:'highp', stencil:false });
   } catch(err) {
     $('#threeViewport').classList.add('three-fallback');
     $('#threeLabels').innerHTML = `<div class="three-fallback-card"><h3>3D visualiser unavailable</h3><p>The original Visualiser remains available for this browser.</p></div>`;
@@ -1226,7 +1238,9 @@ async function renderThreeVisualiser(data){
     return;
   }
   $('#threeViewport').classList.remove('three-fallback');
-  renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2)); renderer.setClearColor(colors.bg, 0);
+  renderer.setPixelRatio(threeRenderPixelRatio(viewport));
+  if('outputColorSpace' in renderer && THREE.SRGBColorSpace) renderer.outputColorSpace = THREE.SRGBColorSpace;
+  renderer.setClearColor(colors.bg, 0);
   viewport.prepend(renderer.domElement);
   const scene = new THREE.Scene(); scene.fog = new THREE.FogExp2(colors.bg, threeVis.mode === 'neural' ? .0011 : .0009);
   const mobileThree = (viewport.getBoundingClientRect?.().width || 650) < 520;
@@ -1270,6 +1284,7 @@ function resizeThree(){
   if(!threeVis.renderer) return;
   const viewport = $('#threeViewport'); const rect = viewport.getBoundingClientRect();
   const w = Math.max(320, rect.width), h = Math.max(320, rect.height);
+  threeVis.renderer.setPixelRatio(threeRenderPixelRatio(viewport));
   threeVis.renderer.setSize(w,h,false); threeVis.camera.aspect = w/h; threeVis.camera.updateProjectionMatrix();
 }
 function threeEffectiveCameraZ(rect){

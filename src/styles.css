@@ -354,7 +354,7 @@
     background: radial-gradient(circle at 48% 42%, rgba(34,130,111,.25), transparent 34%), radial-gradient(circle at 76% 20%, rgba(82,214,181,.12), transparent 24%), linear-gradient(180deg, rgba(5,9,15,.98), rgba(8,13,24,.94));
   }
   .constellation-layout, .three-layout { @apply grid grid-cols-1 items-stretch gap-4 xl:grid-cols-[minmax(0,1fr)_360px]; }
-  .three-viewport canvas { @apply absolute inset-0 block h-full w-full; }
+  .three-viewport canvas { @apply absolute inset-0 block h-full w-full; image-rendering: auto; }
   .graph-inspector { @apply min-h-[420px] rounded-[28px] border border-white/10 bg-white/[.045] p-5 shadow-panel; }
   .inspector-kicker { @apply text-[11px] font-bold uppercase tracking-[.16em] text-yan-orange; }
   .graph-inspector h3 { @apply mt-2 text-xl font-semibold text-white; }
@@ -370,7 +370,7 @@
   .visualiser-loading .loading-spinner { @apply mb-20 h-9 w-9 text-yan-orange; }
   .visualiser-loading strong { @apply mt-8 rounded-full border border-white/10 bg-[var(--surface-50)] px-4 py-2 text-sm font-semibold text-white shadow-panel backdrop-blur-xl; }
   .visualiser-loading em { @apply mt-20 max-w-[260px] text-center text-xs not-italic text-zinc-400; }
-  .three-label { @apply absolute rounded-full border border-white/10 bg-[var(--surface-45)] px-2 py-1 text-[11px] font-bold text-white shadow backdrop-blur-md; }
+  .three-label { @apply absolute rounded-full border border-white/10 bg-[var(--surface-45)] px-2 py-1 text-[11px] font-bold text-white shadow backdrop-blur-md; max-width: 168px; transform: translate3d(-50%,-50%,0); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; text-rendering: geometricPrecision; -webkit-font-smoothing: antialiased; will-change: transform, opacity; }
   .three-label.memory { @apply text-yan-pink; }
   .three-aura-layer { @apply pointer-events-none absolute inset-0; }
   .three-aura-oval { @apply absolute h-28 w-56 rounded-[999px] border border-yan-hot/10 bg-yan-hot/[.035] blur-[1px]; }
@@ -478,7 +478,7 @@
   .drawer-action { @apply w-full; }
   .constellation-wrap, .three-viewport { @apply h-[430px] min-h-[430px] rounded-3xl; }
   .constellation-legend, .three-legend { @apply left-3 right-3 bottom-3; }
-  .three-label { max-width: 120px; transform: translate(-50%,-50%); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .three-label { max-width: 120px; }
 }
 
 @media (max-width: 430px) {
