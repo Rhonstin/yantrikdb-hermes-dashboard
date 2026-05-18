@@ -63,8 +63,8 @@
   .mini { @apply mt-2 text-[11px] leading-4; }
   .muted { @apply text-zinc-400; }
   select, input, textarea { @apply w-full min-w-0 rounded-xl border border-white/10 bg-black/35 px-3 py-2 text-[0.9375rem] leading-5 text-white outline-none transition placeholder:text-zinc-600 focus:border-yan-hot/60 focus:ring-2 focus:ring-yan-hot/20; }
-  input[type="checkbox"] { @apply relative h-4 w-4 min-w-4 shrink-0 appearance-none rounded border border-white/25 bg-black/60 p-0 align-middle; }
-  input[type="checkbox"]:checked { @apply border-emerald-400 bg-emerald-400; }
+  input[type="checkbox"] { @apply relative h-4 w-4 min-w-4 shrink-0 appearance-none rounded border border-white/25 bg-black/60 p-0 align-middle; background-image: none; }
+  input[type="checkbox"]:checked { @apply border-emerald-400 bg-emerald-400; background-image: none; }
   input[type="checkbox"]:checked::after { content: ''; @apply absolute left-1/2 top-1/2 h-2.5 w-1.5 border-b-2 border-r-2 border-black; transform: translate(-50%, -62%) rotate(45deg); }
   label { @apply min-w-0; }
   .token-input { @apply mt-2; }
