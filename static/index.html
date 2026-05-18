@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>YantrikDB Dashboard</title>
   <link rel="icon" href="/static/assets/favicon.svg?v=yantrikdb-white-favicon-2" type="image/svg+xml">
-  <link rel="stylesheet" href="/static/styles.css?v=impeccable-polish-16" />
+  <link rel="stylesheet" href="/static/styles.css?v=impeccable-polish-17" />
 </head>
 <body>
   <div class="grain"></div>
@@ -213,7 +213,7 @@
             <input id="spaceId" placeholder="Space ID, e.g. household" autocomplete="off" />
             <input id="spaceLabel" placeholder="Label, e.g. Household" autocomplete="off" />
             <input id="spaceScope" placeholder="Advanced storage ID, auto-filled if blank" autocomplete="off" />
-            <input id="spaceMembers" placeholder="Members, comma separated" autocomplete="off" />
+            <div id="spaceMembersChecklist" class="checkbox-list" aria-label="Shared space members"></div>
             <button class="btn secondary" type="submit">Add shared space</button>
           </form>
           <div id="spaceList" class="scope-list"></div>
@@ -221,8 +221,9 @@
         <div class="panel scope-panel">
           <div class="panel-head"><h2>Chat routing</h2><span class="muted">which chats use shared memory</span></div>
           <form id="conversationForm" class="scope-form" aria-label="Route chat">
-            <input id="conversationPlatform" placeholder="Platform, e.g. whatsapp" autocomplete="off" />
-            <input id="conversationId" placeholder="Chat ID" autocomplete="off" />
+            <select id="conversationPlatform" aria-label="Chat platform"></select>
+            <input id="conversationId" list="conversationIdOptions" placeholder="Chat ID" autocomplete="off" />
+            <datalist id="conversationIdOptions"></datalist>
             <select id="conversationScope" aria-label="Chat shared space"></select>
             <button class="btn secondary" type="submit">Save chat route</button>
           </form>
@@ -356,6 +357,6 @@
       <div class="modal-actions"><button id="confirmCancel" class="btn secondary">Cancel</button><button id="confirmOk" class="btn primary">Continue</button></div>
     </div>
   </div>
-  <script src="/static/app.js?v=impeccable-polish-16"></script>
+  <script src="/static/app.js?v=impeccable-polish-17"></script>
 </body>
 </html>

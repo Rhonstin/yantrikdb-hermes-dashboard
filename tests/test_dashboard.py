@@ -284,7 +284,10 @@ def test_index_has_identity_scope_page_contract():
     assert "Add actor mapping manually" in html
     assert 'id="actorIdentityFilter"' in html
     assert 'id="spaceForm"' in html
+    assert 'id="spaceMembersChecklist"' in html
     assert 'id="conversationForm"' in html
+    assert '<select id="conversationPlatform"' in html
+    assert 'id="conversationIdOptions"' in html
     assert '<h2>Actors</h2><span class="muted">platform accounts</span>' in html
     assert "Create identities to group platform accounts" in html
     assert "Shared spaces" in html
@@ -300,6 +303,9 @@ def test_index_has_identity_scope_page_contract():
     assert "Identity" in js
     assert "Unassigned" in js
     assert "memory bucket discovery" in js
+    assert "renderSpaceMemberChecklist" in js
+    assert "selectedSpaceMembers" in js
+    assert "availablePlatformOptions" in js
     assert "Chat route saved" in js
     assert "Shared space added" in js
     assert "identity-scope" in js

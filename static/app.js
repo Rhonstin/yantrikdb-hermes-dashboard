@@ -269,11 +269,31 @@ function availableIdentityOptions(cfg){
   const ids=(cfg.identities||[]).map(i=>i.id).filter(Boolean);
   return ids.length ? ids : [''];
 }
+function identityLabel(id, cfg=identityConfig()){
+  const item=(cfg.identities||[]).find(i=>i.id===id);
+  return item?.label || id;
+}
 function availableScopeOptions(cfg){
   const scopes=[];
-  (cfg.identities||[]).forEach(i=>{ if(i.private_scope) scopes.push(i.private_scope); if(i.resolved_scope) scopes.push(i.resolved_scope); });
-  (cfg.spaces||[]).forEach(s=>{ if(s.scope) scopes.push(s.scope); });
-  return [...new Set(scopes)].filter(Boolean);
+  (cfg.spaces||[]).forEach(s=>{ if(s.scope) scopes.push({value:s.scope, label:s.label || s.id || s.scope}); });
+  return scopes.filter(s=>s.value);
+}
+function availablePlatformOptions(cfg){
+  const vals=['whatsapp','telegram', ...(cfg.actors||[]).map(a=>a.platform), ...(cfg.conversations||[]).map(c=>c.platform)].filter(Boolean);
+  return [...new Set(vals)];
+}
+function availableConversationOptions(cfg){
+  return [...new Set((cfg.conversations||[]).map(c=>c.conversation_id).filter(Boolean))];
+}
+function selectedSpaceMembers(){
+  return $$('[data-space-member]:checked').map(el=>el.value).filter(Boolean);
+}
+function renderSpaceMemberChecklist(cfg, selected=[]){
+  const wrap=$('#spaceMembersChecklist'); if(!wrap) return;
+  const ids=availableIdentityOptions(cfg).filter(Boolean);
+  if(!ids.length){ wrap.innerHTML='<span class="muted">Create people first, then choose members here.</span>'; return; }
+  const selectedSet=new Set(selected||[]);
+  wrap.innerHTML=`<div class="checkbox-list-title">Members</div>`+ids.map(id=>`<label class="checkbox-pill"><input type="checkbox" data-space-member value="${esc(id)}" ${selectedSet.has(id)?'checked':''} /><span>${esc(identityLabel(id,cfg))}</span></label>`).join('');
 }
 function actorIdentityFilterOptions(cfg){
   const ids=availableIdentityOptions(cfg).filter(Boolean);
@@ -304,11 +324,20 @@ function renderIdentityScopeSelectors(cfg){
     actorSel.innerHTML=options.map(id=>`<option value="${esc(id)}">${esc(id || 'Choose identity')}</option>`).join('');
     if(options.includes(current)) actorSel.value=current;
   }
+  renderSpaceMemberChecklist(cfg, selectedSpaceMembers());
+  const platformSel=$('#conversationPlatform');
+  if(platformSel){
+    const current=platformSel.value; const options=availablePlatformOptions(cfg);
+    platformSel.innerHTML=(options.length?options:['']).map(platform=>`<option value="${esc(platform)}">${esc(platform || 'Choose platform')}</option>`).join('');
+    if(options.includes(current)) platformSel.value=current;
+  }
+  const chatOptions=$('#conversationIdOptions');
+  if(chatOptions){ chatOptions.innerHTML=availableConversationOptions(cfg).map(id=>`<option value="${esc(id)}"></option>`).join(''); }
   const scopeSel=$('#conversationScope');
   if(scopeSel){
     const current=scopeSel.value; const options=availableScopeOptions(cfg);
-    scopeSel.innerHTML=(options.length?options:['']).map(scope=>`<option value="${esc(scope)}">${esc(scope || 'Choose scope')}</option>`).join('');
-    if(options.includes(current)) scopeSel.value=current;
+    scopeSel.innerHTML=(options.length?options:[{value:'',label:'Create a shared space first'}]).map(scope=>`<option value="${esc(scope.value)}">${esc(scope.label)}</option>`).join('');
+    if(options.some(o=>o.value===current)) scopeSel.value=current;
   }
 }
 async function persistIdentityConfig(cfg, message='Identity & Scope registry saved'){
@@ -337,7 +366,7 @@ function fillActorForm(raw){
 }
 function fillSpaceForm(id){
   const item=(identityConfig().spaces||[]).find(s=>s.id===id); if(!item) return;
-  $('#spaceId').value=item.id||''; $('#spaceLabel').value=item.label||''; $('#spaceScope').value=item.scope||''; $('#spaceMembers').value=Array.isArray(item.members)?item.members.join(', '):(item.members||''); $('#spaceId').focus();
+  $('#spaceId').value=item.id||''; $('#spaceLabel').value=item.label||''; $('#spaceScope').value=item.scope||''; renderSpaceMemberChecklist(identityConfig(), Array.isArray(item.members)?item.members:csvList(item.members||'')); $('#spaceId').focus();
 }
 function fillConversationForm(raw){
   const cfg=identityConfig(); const item=(cfg.conversations||[]).find(c=>`${c.platform}:${c.conversation_id}`===raw); if(!item) return;
@@ -367,13 +396,13 @@ async function addSpaceFromForm(e){
   if(!id){ toast('Enter a shared space ID first'); return; }
   const cfg=identityConfig();
   const scope=cleanId($('#spaceScope')?.value) || `space:${id}`;
-  upsertBy(cfg.spaces,{id,label:cleanId($('#spaceLabel')?.value)||id,scope,members:csvList($('#spaceMembers')?.value)}, item=>item.id);
+  upsertBy(cfg.spaces,{id,label:cleanId($('#spaceLabel')?.value)||id,scope,members:selectedSpaceMembers()}, item=>item.id);
   try{ await persistIdentityConfig(cfg, 'Shared space added'); e.target.reset(); }catch(err){ toast(err.message || 'Could not add shared space'); }
 }
 async function addConversationFromForm(e){
   e.preventDefault();
   const platform=cleanId($('#conversationPlatform')?.value); const conversation_id=cleanId($('#conversationId')?.value); const scope=cleanId($('#conversationScope')?.value);
-  if(!platform || !conversation_id || !scope){ toast('Enter platform, conversation ID, and scope'); return; }
+  if(!platform || !conversation_id || !scope){ toast('Choose platform, chat ID, and shared space'); return; }
   const cfg=identityConfig();
   upsertBy(cfg.conversations,{platform,conversation_id,scope}, item=>`${item.platform}:${item.conversation_id}`);
   try{ await persistIdentityConfig(cfg, 'Chat route saved'); e.target.reset(); renderIdentityScopeSelectors(cfg); }catch(err){ toast(err.message || 'Could not route chat'); }
