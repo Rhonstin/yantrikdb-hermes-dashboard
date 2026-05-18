@@ -564,6 +564,12 @@ def test_memory_detail_actions_use_neutral_copy_and_destructive_forget():
     assert "drawer-action warn" not in js
 
 
+def test_copyable_diag_values_are_right_aligned():
+    css_source = Path("src/styles.css").read_text()
+    assert ".diag-row strong { @apply break-words text-right text-zinc-100; }" in css_source
+    assert ".diag-link { @apply inline-block max-w-full break-words text-right text-yan-pink" in css_source
+
+
 def test_readme_documents_hermes_plugin_install_and_no_admin_token():
     readme = Path("README.md").read_text()
     assert "# YantrikDB for Hermes Dashboard" in readme

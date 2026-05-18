@@ -289,7 +289,7 @@
   .diag-row { @apply grid grid-cols-[130px_1fr] gap-3 rounded-xl border border-white/10 bg-white/[.035] px-3 py-2 text-sm; }
   .diag-row span { @apply text-zinc-500; }
   .diag-row strong { @apply break-words text-right text-zinc-100; }
-  .diag-link { @apply text-yan-pink underline-offset-4 hover:underline; }
+  .diag-link { @apply inline-block max-w-full break-words text-right text-yan-pink underline-offset-4 hover:underline; }
   .detail-section { @apply mt-4; }
   .detail-section pre, .drawer pre, .panel pre { @apply max-w-full max-h-[360px] overflow-auto whitespace-pre-wrap break-words rounded-2xl border border-white/10 bg-[var(--surface-40)] p-4 text-xs leading-6 text-blue-100; }
   .panel pre:empty { @apply hidden; }
