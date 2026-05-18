@@ -148,9 +148,11 @@
 
   .memory-list, .compact-list { @apply grid min-w-0 gap-3; }
   .memory-item, .recall-card {
-    @apply min-w-0 cursor-pointer overflow-hidden rounded-2xl border border-white/10 bg-white/[.045] p-4 transition hover:-translate-y-0.5 hover:border-yan-hot/35 hover:bg-white/[.07] hover:shadow-glow;
+    @apply min-w-0 cursor-pointer overflow-hidden rounded-2xl border border-white/10 bg-white/[.04] p-4 transition hover:-translate-y-0.5 hover:border-yan-hot/35 hover:bg-white/[.065] hover:shadow-glow;
   }
-  .memory-title { @apply text-sm font-extrabold text-white; }
+  .memory-headline { @apply flex min-w-0 flex-wrap items-start justify-between gap-2; }
+  .memory-title { @apply min-w-0 text-sm font-extrabold text-white; }
+  .namespace-chip { @apply max-w-full rounded-full border border-yan-orange/25 bg-yan-orange/10 px-2 py-0.5 text-[10px] font-bold text-yan-orange; overflow-wrap: anywhere; }
   .memory-text { @apply mt-2 line-clamp-3 break-words text-sm leading-6 text-zinc-300; }
   .recall-card p { @apply break-words leading-7; overflow-wrap: anywhere; }
   .meta-row { @apply mt-3 flex min-w-0 flex-wrap gap-2; }
@@ -192,16 +194,21 @@
   .modal-card h3 { @apply mt-2 text-xl font-black text-white; }
   .modal-actions { @apply mt-5 flex justify-end gap-2; }
 
-  .settings-grid { @apply grid gap-4; }
-  .switch-row { @apply flex flex-wrap items-center justify-between gap-4 rounded-2xl border border-white/10 bg-white/[.04] p-4; }
-  .switch-row strong { @apply block text-white; }
-  .switch-row small { @apply mt-1 block text-sm text-zinc-400; }
+  .settings-layout { @apply grid min-w-0 grid-cols-1 gap-5 xl:grid-cols-[minmax(0,1.15fr)_minmax(320px,.85fr)]; }
+  .setting-list { @apply divide-y divide-white/10 overflow-hidden rounded-2xl border border-white/10 bg-black/20; }
+  .setting-row { @apply grid min-w-0 gap-3 p-4 md:grid-cols-[minmax(0,1fr)_auto] md:items-center; }
+  .setting-row strong, .switch-row strong { @apply block text-white; }
+  .setting-row small, .switch-row small { @apply mt-1 block text-sm leading-5 text-zinc-400; }
+  .setting-row .btn { @apply justify-self-start md:justify-self-end; }
+  .password-row { @apply md:grid-cols-[minmax(0,1fr)_minmax(220px,300px)_auto]; }
+  .export-row, .session-row { @apply bg-white/[.018]; }
+  .switch-row { @apply flex flex-wrap items-center justify-between gap-4; }
   .switch-row input[type="checkbox"] { @apply h-7 w-12 rounded-full border-white/20 bg-black/60; }
   .switch-row input[type="checkbox"]::after { content: ''; @apply absolute left-1 top-1 h-5 w-5 rounded-full bg-zinc-600 shadow transition; }
   .switch-row input[type="checkbox"]:checked { @apply border-yan-orange bg-yan-orange; }
   .switch-row input[type="checkbox"]:checked::after { content: ''; @apply left-6 bg-[#111118]; }
   .switch-row input[type="checkbox"]:focus-visible { @apply ring-2 ring-yan-orange/40 ring-offset-2 ring-offset-black; }
-  .password-card { @apply grid gap-3 rounded-2xl border border-white/10 bg-white/[.04] p-4; }
+  .password-card { @apply grid gap-3; }
   .password-card strong { @apply block text-white; }
   .password-card small { @apply mt-1 block text-sm text-zinc-400; }
   .settings-actions { @apply flex flex-wrap gap-2; }
@@ -283,7 +290,8 @@
   .panel, .glass, .hero-card, .recall-panel, .helper-card, .detail, .danger-zone { @apply rounded-2xl p-4; }
   .toolbar { @apply grid grid-cols-1; }
   .toolbar input:not([type="checkbox"]), .toolbar select, .toolbar button { @apply w-full min-w-0; }
-  .action-row .btn { @apply w-full; }
+  .action-row .btn, .setting-row .btn { @apply w-full; }
+  .password-row input { @apply w-full; }
   .toolbar input[type="checkbox"] { @apply h-4 w-4 min-w-4 flex-none; }
   .section-tabs { @apply grid w-full grid-cols-2; }
   .section-tabs button { @apply truncate px-3; }

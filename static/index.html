@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>YantrikDB Dashboard</title>
   <link rel="icon" href="/static/assets/favicon.svg?v=yantrikdb-white-favicon-2" type="image/svg+xml">
-  <link rel="stylesheet" href="/static/styles.css?v=impeccable-polish-1" />
+  <link rel="stylesheet" href="/static/styles.css?v=impeccable-polish-2" />
 </head>
 <body>
   <div class="grain"></div>
@@ -150,7 +150,7 @@
     <section id="view-graph" class="view">
       <div class="panel helper-card">
         <div class="panel-head"><h2>How to use Entity Graph</h2><span class="muted">relationship edges only</span></div>
-        <p>Search picks an entity. Open graph draws YantrikDB relationship edges for that entity and lists memories explicitly linked to it. Plain text memories do not automatically appear here unless YantrikDB has populated entity/edge rows. If this page is empty, use Recall Debugger for normal memory search.</p>
+        <p>Search picks an entity. Open graph draws YantrikDB relationship edges for that entity and lists memories explicitly linked to it. Plain text memories do not automatically appear here unless YantrikDB has populated entity/edge rows. If this page is empty, use Recall for normal memory search.</p>
       </div>
       <div class="toolbar">
         <input id="entitySearch" placeholder="Search entity…" />
@@ -213,30 +213,41 @@
     </section>
 
     <section id="view-settings" class="view">
-      <div class="panel settings-panel">
-        <div class="panel-head"><h2>Settings</h2><span class="muted">Local controls</span></div>
-        <div class="settings-grid">
-          <label class="switch-row">
-            <span><strong>Admin Mode</strong><small>Allow memory-changing actions such as maintenance, conflict resolution, and forgetting memories.</small></span>
-            <input id="adminModeToggle" type="checkbox" />
-          </label>
-          <div class="password-card">
-            <div><strong>Dashboard password</strong><small>Protect dashboard APIs and memory content when accessed from any device.</small></div>
-            <input id="dashboardPassword" type="password" placeholder="New password" autocomplete="new-password" />
-            <div class="settings-actions">
-              <button id="savePassword" class="btn primary">Set / change password</button>
-              <button id="disablePassword" class="btn secondary">Disable password</button>
+      <div class="settings-layout">
+        <div class="panel settings-panel">
+          <div class="panel-head"><h2>Settings</h2><span class="muted">Local controls</span></div>
+          <div class="setting-list">
+            <label class="setting-row switch-row">
+              <span><strong>Admin Mode</strong><small>Allow memory-changing actions such as maintenance, conflict resolution, and forgetting memories.</small></span>
+              <input id="adminModeToggle" type="checkbox" />
+            </label>
+            <div class="setting-row password-row">
+              <div><strong>Dashboard password</strong><small id="passwordState">Password disabled</small></div>
+              <input id="dashboardPassword" type="password" placeholder="New password" autocomplete="new-password" aria-label="New dashboard password" />
+              <div class="settings-actions">
+                <button id="savePassword" class="btn primary">Save password</button>
+                <button id="disablePassword" class="btn secondary">Disable</button>
+              </div>
             </div>
-            <div id="passwordState" class="muted mini">Password disabled</div>
+            <div class="setting-row export-row">
+              <div><strong>Export active memories</strong><small>Download the current memory scope for backup or inspection.</small></div>
+              <a id="settingsExportLink" class="btn secondary" href="#">Export <span class="btn-sub">JSONL</span></a>
+            </div>
+            <div class="setting-row session-row">
+              <div><strong>Session</strong><small>Clear this browser’s dashboard login session.</small></div>
+              <button id="logoutBtn" class="btn secondary">Log out</button>
+            </div>
           </div>
-          <div class="settings-actions">
-            <a id="settingsExportLink" class="btn secondary" href="#">Export memories <span class="btn-sub">JSONL</span></a>
-            <button id="logoutBtn" class="btn secondary">Log out</button>
-          </div>
-          <div class="settings-note"><strong>Launch default</strong><span>Set <code>YANTRIKDB_DASHBOARD_ADMIN_MODE=true</code> to start with Admin Mode enabled. Leave it off for normal read-only browsing.</span></div>
+        </div>
+        <div class="panel advanced-panel settings-side">
+          <div class="panel-head"><h2>Launch default</h2><span class="muted">Advanced</span></div>
+          <p class="page-copy">Set <code>YANTRIKDB_DASHBOARD_ADMIN_MODE=true</code> to start with Admin Mode enabled. Leave it off for normal read-only browsing.</p>
+          <details class="details-block" open>
+            <summary>Runtime details</summary>
+            <div id="settingsRuntime" class="diag-grid"></div>
+          </details>
         </div>
       </div>
-      <div class="panel advanced-panel"><div class="panel-head"><h2>Runtime</h2><span class="muted">Advanced details</span></div><div id="settingsRuntime" class="diag-grid"></div></div>
     </section>
   </main>
 
@@ -264,6 +275,6 @@
       <div class="modal-actions"><button id="confirmCancel" class="btn secondary">Cancel</button><button id="confirmOk" class="btn primary">Continue</button></div>
     </div>
   </div>
-  <script src="/static/app.js?v=impeccable-polish-1"></script>
+  <script src="/static/app.js?v=impeccable-polish-2"></script>
 </body>
 </html>
