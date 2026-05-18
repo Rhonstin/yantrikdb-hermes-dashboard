@@ -571,3 +571,13 @@ def test_three_visualiser_inspector_actions_use_button_styles():
     assert 'id="threeMemory" class="btn primary tiny"' in js
     assert 'id="threeSearch" class="btn secondary tiny"' in js
     assert 'id="threeSearch" class="tiny"' not in js
+
+
+def test_mobile_scope_and_visualiser_toolbar_css_is_compact():
+    css = Path("src/styles.css").read_text()
+    assert ".scope-bar select" in css
+    assert "appearance: none" in css
+    assert "background-position: calc(100% - 15px) 50%" in css
+    assert ".visualiser-actions { @apply -mx-1 flex-nowrap overflow-x-auto" in css
+    assert ".visualiser-toolbar .visualiser-actions .btn" in css
+    assert "scrollbar-width: none" in css

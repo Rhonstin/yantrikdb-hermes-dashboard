@@ -297,6 +297,8 @@
   .btn-sub { @apply ml-1 rounded-md border border-white/10 bg-black/25 px-1.5 py-0.5 text-[10px] uppercase tracking-[.12em] text-zinc-400; }
 
   .visualiser-toolbar { @apply mb-4; }
+  .visualiser-actions { @apply flex min-w-0 flex-wrap items-center gap-2; }
+  .visualiser-toolbar .muted { @apply min-w-0 text-sm leading-6; }
   .cluster-row { @apply mb-3 flex flex-wrap gap-2; }
   .cluster-pill { @apply rounded-full border border-white/10 bg-white/[.05] px-3 py-1.5 text-xs font-bold text-zinc-300; }
   .constellation-wrap, .three-viewport {
@@ -384,6 +386,16 @@
   .panel, .glass, .hero-card, .recall-panel, .helper-card, .detail, .danger-zone { @apply rounded-2xl p-4; }
   .toolbar { @apply grid grid-cols-1; }
   .toolbar input:not([type="checkbox"]), .toolbar select, .toolbar button { @apply w-full min-w-0; }
+  .scope-bar { @apply relative grid w-full max-w-none grid-cols-1 gap-1 rounded-[22px] px-4 py-3; }
+  .scope-kicker { @apply pr-24 text-[10px]; }
+  .scope-bar select { @apply min-h-8 w-full max-w-none truncate rounded-lg py-0 pl-0 pr-8 text-[1rem] leading-8; appearance: none; background-image: linear-gradient(45deg, transparent 50%, rgba(161,161,170,.95) 50%), linear-gradient(135deg, rgba(161,161,170,.95) 50%, transparent 50%); background-position: calc(100% - 15px) 50%, calc(100% - 9px) 50%; background-size: 6px 6px, 6px 6px; background-repeat: no-repeat; }
+  .scope-count { @apply absolute right-4 top-3 px-2 py-0.5 text-[10px]; }
+  .scope-loading { @apply w-fit; }
+  .visualiser-toolbar { @apply flex flex-col gap-3 p-3; }
+  .visualiser-actions { @apply -mx-1 flex-nowrap overflow-x-auto px-1 pb-1; scrollbar-width: none; }
+  .visualiser-actions::-webkit-scrollbar { display: none; }
+  .visualiser-toolbar .visualiser-actions .btn { @apply w-auto flex-none rounded-full px-3 py-1.5 text-sm; min-height: 36px; }
+  .visualiser-toolbar .muted { @apply text-xs leading-5; }
   .action-row .btn, .setting-row .btn { @apply w-full; }
   .switch-row { @apply grid-cols-[minmax(0,1fr)_auto]; }
   .switch-row .switch-control-wrap { @apply w-[56px]; }
@@ -408,5 +420,8 @@
   .brand-title { @apply text-[21px]; }
   .brand-sub { @apply max-w-[230px]; }
   .shell { @apply px-3; }
+  .scope-bar { @apply px-3 py-2.5; }
+  .scope-count { @apply right-3 top-2.5; }
+  .scope-bar select { @apply text-[0.94rem]; }
   .top-actions { @apply grid-cols-1; }
 }
