@@ -284,7 +284,7 @@ def test_index_has_identity_scope_page_contract():
     assert "Add actor mapping manually" in html
     assert 'id="spaceForm"' in html
     assert 'id="conversationForm"' in html
-    assert "Detected actors" in html
+    assert '<h2>Actors</h2><span class="muted">platform accounts</span>' in html
     assert "who each memory bucket belongs to" in html
     assert "Edit person" in js
     assert "Technical details" in js
