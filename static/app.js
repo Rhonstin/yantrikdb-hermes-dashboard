@@ -1,7 +1,7 @@
 const $ = (s) => document.querySelector(s);
 const $$ = (s) => [...document.querySelectorAll(s)];
-const state = { health:null, stats:null, settings:null, defaultNamespace:'', selectedNamespace:'__all__', view:'overview', memoryOffset:0, selectedMemory:null, recentWrites:[] };
-const VALID_VIEWS = new Set(['overview','visualiser','memories','recall','conflicts','graph','lifecycle','ops','settings']);
+const state = { health:null, stats:null, settings:null, defaultNamespace:'', selectedNamespace:'__all__', view:'overview', memoryOffset:0, selectedMemory:null, recentWrites:[], identityScope:null };
+const VALID_VIEWS = new Set(['overview','visualiser','memories','recall','conflicts','graph','identity-scope','lifecycle','ops','settings']);
 const ALL_NAMESPACES = '__all__';
 const DEFAULT_VIZ_CAMERA = { rotation:.55, tilt:.78, zoom:1, panX:0, panY:0 };
 const viz = { frame:0, nodes:[], edges:[], byId:{}, stars:[], data:null, mode:'constellation', paused:false, interaction:'rotate', drag:null, lastFrameTime:0, ...DEFAULT_VIZ_CAMERA };
@@ -80,7 +80,7 @@ function setView(view, opts={}){
   $$('.nav-item').forEach(b=>b.classList.toggle('active', b.dataset.view===view));
   document.body.classList.remove('menu-open');
   $('#menuToggle')?.setAttribute('aria-expanded','false');
-  const names={overview:'Memory Operations',visualiser:'Visualiser',memories:'Memory Browser',recall:'Recall',conflicts:'Contradictions',graph:'Entity Graph',lifecycle:'Lifecycle',ops:'Maintenance',settings:'Settings'};
+  const names={overview:'Memory Operations',visualiser:'Visualiser',memories:'Memory Browser',recall:'Recall',conflicts:'Contradictions',graph:'Entity Graph','identity-scope':'Identity & Scope',lifecycle:'Lifecycle',ops:'Maintenance',settings:'Settings'};
   $('#pageTitle').textContent=names[view]||view;
   if(view!=='visualiser') stopVisualiser();
   if(view!=='memories') closeMemoryDetail({silent:true});
@@ -88,7 +88,7 @@ function setView(view, opts={}){
   if(view==='overview' && !state.stats) loadStats();
   if(view==='visualiser') loadVisualiser();
   if(view==='memories') loadMemories(); if(view==='recall' && !$('#recallQuery').value) $('#recallQuery').value='What should this agent remember about YantrikDB dashboards?';
-  if(view==='conflicts') loadConflicts(); if(view==='graph') loadEntities(); if(view==='lifecycle') loadLifecycle(); if(view==='ops') loadHealthPanel(); if(view==='settings') loadSettings();
+  if(view==='conflicts') loadConflicts(); if(view==='graph') loadEntities(); if(view==='identity-scope') loadIdentityScope(); if(view==='lifecycle') loadLifecycle(); if(view==='ops') loadHealthPanel(); if(view==='settings') loadSettings();
 }
 
 async function init(){
@@ -125,6 +125,7 @@ async function init(){
   $('#threeExitFullscreen')?.addEventListener('click',()=>document.exitFullscreen?.());
   $$('.visualiser-tabs button[data-three-mode]').forEach(b=>b.onclick=()=>setVisualiserMode(b.dataset.threeMode));
   $('#loadEntities').onclick=loadEntities; $('#loadGraph').onclick=()=>loadGraph($('#graphEntity').value||$('#entitySearch').value);
+  $('#reloadIdentityScope')?.addEventListener('click',()=>loadIdentityScope()); $('#saveIdentityScope')?.addEventListener('click',()=>saveIdentityScope());
   $('#runThink').onclick=runThink; $('#refreshHealth').onclick=loadHealthPanel; $('#adminModeToggle')?.addEventListener('change',()=>saveSettings());
   $('#savePassword')?.addEventListener('click',()=>saveSettings({password:true}));
   $('#disablePassword')?.addEventListener('click',()=>saveSettings({disablePassword:true}));
@@ -187,6 +188,53 @@ async function refreshAll(){
     setScopeLoading(false);
     if(state.view==='visualiser') setVisualiserLoading(false);
   }
+}
+
+
+function compactJson(value){ return JSON.stringify(value||{}, null, 2); }
+function chip(label, value){ return `<div class="scope-chip"><span>${esc(label)}</span><strong>${esc(value || '—')}</strong></div>`; }
+function scopeEmpty(title, body){ return `<div class="empty helpful-empty"><strong>${esc(title)}</strong><span>${esc(body)}</span></div>`; }
+function renderScopeRows(items, kind){
+  if(!items?.length){
+    const copy={
+      identities:['No identities yet.','Add canonical people or service identities in Advanced config.'],
+      actors:['No actors mapped.','Map platform IDs to identities so one person does not split into multiple owners.'],
+      spaces:['No shared scopes yet.','Create shared spaces for group chats or teams.'],
+      conversations:['No conversation routes.','Route each chat/thread to a private owner or shared scope.'],
+    }[kind] || ['Nothing configured.','Add rows in Advanced config.'];
+    return scopeEmpty(copy[0], copy[1]);
+  }
+  return items.map(item=>{
+    const title=item.label || item.name || item.id || item.actor_id || item.conversation_id || item.scope || 'Unlabelled';
+    const pieces=[];
+    if(kind==='identities') pieces.push(chip('ID', item.id), chip('Private scope', item.private_scope));
+    if(kind==='actors') pieces.push(chip('Platform', item.platform), chip('Actor', item.actor_id), chip('Identity', item.identity));
+    if(kind==='spaces') pieces.push(chip('Scope', item.scope), chip('Members', Array.isArray(item.members)?item.members.join(', '):(item.members||'')));
+    if(kind==='conversations') pieces.push(chip('Platform', item.platform), chip('Conversation', item.conversation_id), chip('Scope', item.scope));
+    return `<div class="scope-card"><strong>${esc(title)}</strong><div class="scope-chip-row">${pieces.join('')}</div></div>`;
+  }).join('');
+}
+function renderIdentityScope(data){
+  state.identityScope=data;
+  const cfg=data.identity_scope||{}; const summary=data.summary||{};
+  $('#identityScopeSummary').innerHTML=[['Identities',summary.identities],['Actors',summary.actors],['Shared scopes',summary.spaces],['Routes',summary.conversations],['Unmapped',summary.unmapped_namespaces]].map(([k,v])=>`<div class="metric"><div class="metric-label">${esc(k)}</div><div class="metric-value">${esc(fmt(v||0))}</div></div>`).join('');
+  $('#identityList').innerHTML=renderScopeRows(cfg.identities,'identities');
+  $('#actorList').innerHTML=renderScopeRows(cfg.actors,'actors');
+  $('#spaceList').innerHTML=renderScopeRows(cfg.spaces,'spaces');
+  $('#conversationList').innerHTML=renderScopeRows(cfg.conversations,'conversations');
+  $('#identityNamespaceTable').innerHTML=`<table><thead><tr><th>Namespace</th><th>Rows</th><th>Mapped</th></tr></thead><tbody>${(data.namespace_inventory||[]).map(n=>`<tr><td><code>${esc(n.namespace)}</code></td><td>${fmt(n.count)}</td><td><span class="pill ${n.mapped?'neutral':'warn'}">${n.mapped?'Mapped':'Unmapped'}</span></td></tr>`).join('') || '<tr><td colspan="3">No namespaces found.</td></tr>'}</tbody></table>`;
+  $('#identityScopeJson').value=compactJson(cfg);
+}
+async function loadIdentityScope(){
+  const data=await api('/api/identity-scope');
+  renderIdentityScope(data);
+}
+async function saveIdentityScope(){
+  try{
+    const parsed=JSON.parse($('#identityScopeJson').value||'{}');
+    const data=await api('/api/identity-scope',{method:'POST',body:JSON.stringify({identity_scope:parsed})});
+    renderIdentityScope(data); toast('Identity & Scope registry saved');
+  }catch(e){ toast(e.message || 'Invalid Identity & Scope JSON'); }
 }
 
 function settingsRows(s){

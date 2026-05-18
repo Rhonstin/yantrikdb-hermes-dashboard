@@ -213,3 +213,64 @@ def test_index_has_memory_namespace_filter_and_maintenance_label():
     assert "memoryNamespaceFilter" in html
     assert "Maintenance" in html
     assert "think()</button>" not in html
+
+
+def test_identity_scope_api_returns_config_and_unmapped_namespaces(tmp_path, monkeypatch):
+    import sqlite3
+
+    db_path = tmp_path / "yantrikdb.db"
+    with sqlite3.connect(db_path) as conn:
+        conn.execute("CREATE TABLE memories (rid TEXT PRIMARY KEY, namespace TEXT)")
+        conn.executemany("INSERT INTO memories VALUES (?,?)", [("r1", "owner:person-alpha"), ("r2", "space:team-alpha")])
+    monkeypatch.setattr(dashboard, "DB_PATH", db_path)
+    monkeypatch.setattr(dashboard, "SETTINGS_PATH", tmp_path / "settings.json")
+    dashboard.save_dashboard_settings({
+        "identity_scope": {
+            "identities": [{"id": "person-alpha", "label": "Person Alpha", "private_scope": "owner:person-alpha"}],
+            "actors": [{"platform": "chat", "actor_id": "actor-alpha", "identity": "person-alpha"}],
+            "spaces": [{"id": "team-alpha", "label": "Team Alpha", "scope": "space:team-alpha", "members": ["person-alpha"]}],
+            "conversations": [{"platform": "chat", "conversation_id": "room-alpha", "scope": "space:team-alpha"}],
+        }
+    })
+
+    client = TestClient(dashboard.app)
+    response = client.get("/api/identity-scope")
+
+    assert response.status_code == 200
+    data = response.json()
+    assert data["summary"] == {"identities": 1, "actors": 1, "spaces": 1, "conversations": 1, "unmapped_namespaces": 0}
+    assert data["identity_scope"]["spaces"][0]["scope"] == "space:team-alpha"
+    assert data["namespace_inventory"] == [
+        {"namespace": "owner:person-alpha", "count": 1, "mapped": True},
+        {"namespace": "space:team-alpha", "count": 1, "mapped": True},
+    ]
+
+
+def test_identity_scope_api_persists_config_when_admin_enabled(tmp_path, monkeypatch):
+    monkeypatch.setattr(dashboard, "SETTINGS_PATH", tmp_path / "settings.json")
+    monkeypatch.setattr(dashboard, "ADMIN_MODE_ENV", True)
+    client = TestClient(dashboard.app)
+    payload = {
+        "identity_scope": {
+            "identities": [{"id": "person-beta", "label": "Person Beta", "private_scope": "owner:person-beta"}],
+            "actors": [],
+            "spaces": [],
+            "conversations": [],
+        }
+    }
+
+    response = client.post("/api/identity-scope", json=payload)
+
+    assert response.status_code == 200
+    assert dashboard.load_dashboard_settings()["identity_scope"]["identities"][0]["id"] == "person-beta"
+
+
+def test_index_has_identity_scope_page_contract():
+    html = (Path(dashboard.STATIC_DIR) / "index.html").read_text()
+    js = (Path(dashboard.STATIC_DIR) / "app.js").read_text()
+    assert 'data-view="identity-scope">Identity &amp; Scope</button>' in html
+    assert 'id="view-identity-scope"' in html
+    assert 'id="identityScopeSummary"' in html
+    assert 'id="identityScopeJson"' in html
+    assert "identity-scope" in js
+    assert "/api/identity-scope" in js

@@ -132,6 +132,21 @@
   .stat-label, .metric-label { @apply text-[10px] font-bold uppercase tracking-[.16em] text-zinc-500; }
   .stat-value, .metric-value { @apply mt-2 break-words text-[1.8rem] font-semibold leading-none tracking-[-.018em] text-white; font-variant-numeric: tabular-nums; }
 
+
+  .identity-hero { @apply grid gap-4 md:grid-cols-[minmax(0,1fr)_minmax(260px,.9fr)] md:items-start; }
+  .identity-hero h2 { @apply mt-2 text-2xl font-semibold tracking-[-.02em] text-white; }
+  .identity-summary { @apply grid grid-cols-2 gap-3 sm:grid-cols-3 xl:grid-cols-5; }
+  .scope-grid { @apply grid min-w-0 grid-cols-1 gap-5 xl:grid-cols-2; }
+  .scope-panel { @apply self-start; }
+  .scope-list { @apply grid gap-3; }
+  .scope-card { @apply rounded-2xl border border-white/10 bg-white/[.035] p-4; }
+  .scope-card > strong { @apply block break-words text-sm font-semibold text-white; }
+  .scope-chip-row { @apply mt-3 flex flex-wrap gap-2; }
+  .scope-chip { @apply min-w-0 rounded-xl border border-white/10 bg-black/20 px-3 py-2; }
+  .scope-chip span { @apply block text-[10px] font-bold uppercase tracking-[.14em] text-zinc-500; }
+  .scope-chip strong { @apply mt-1 block max-w-[16rem] truncate text-xs font-semibold text-zinc-100; }
+  .json-editor { @apply min-h-[260px] w-full rounded-2xl border border-white/10 bg-black/35 p-4 font-mono text-xs leading-5 text-zinc-100 outline-none transition focus:border-yan-hot/50 focus:ring-2 focus:ring-yan-hot/20; }
+
   .toolbar { @apply mb-4 flex min-w-0 flex-wrap items-center gap-2 rounded-2xl border border-white/10 bg-black/25 p-3; }
   .toolbar.compact { @apply mb-0; }
   .toolbar input:not([type="checkbox"]), .toolbar select { @apply min-w-[180px] flex-1; }

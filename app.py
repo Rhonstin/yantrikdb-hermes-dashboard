@@ -262,6 +262,10 @@ class SettingsRequest(BaseModel):
     disable_password: bool = False
 
 
+class IdentityScopeRequest(BaseModel):
+    identity_scope: dict[str, Any]
+
+
 @app.middleware("http")
 async def password_gate(request: Request, call_next):
     path = request.url.path
@@ -314,6 +318,63 @@ def health() -> dict[str, Any]:
         "namespaces": namespaces,
     }
 
+
+
+def default_identity_scope_config() -> dict[str, list[dict[str, Any]]]:
+    return {"identities": [], "actors": [], "spaces": [], "conversations": []}
+
+
+def normalise_identity_scope_config(value: Any) -> dict[str, list[dict[str, Any]]]:
+    base = default_identity_scope_config()
+    if not isinstance(value, dict):
+        return base
+    for key in base:
+        rows_value = value.get(key, [])
+        if isinstance(rows_value, list):
+            base[key] = [dict(item) for item in rows_value if isinstance(item, dict)]
+    return base
+
+
+def identity_scope_payload() -> dict[str, Any]:
+    settings = load_dashboard_settings()
+    config = normalise_identity_scope_config(settings.get("identity_scope"))
+    mapped_namespaces: set[str] = set()
+    for ident in config["identities"]:
+        if ident.get("private_scope"):
+            mapped_namespaces.add(str(ident["private_scope"]))
+    for space in config["spaces"]:
+        if space.get("scope"):
+            mapped_namespaces.add(str(space["scope"]))
+    for convo in config["conversations"]:
+        if convo.get("scope"):
+            mapped_namespaces.add(str(convo["scope"]))
+    namespace_rows = rows("SELECT namespace, COUNT(*) count FROM memories GROUP BY namespace ORDER BY namespace") if table_exists("memories") else []
+    inventory = [
+        {"namespace": str(row["namespace"]), "count": int(row["count"] or 0), "mapped": str(row["namespace"]) in mapped_namespaces}
+        for row in namespace_rows
+    ]
+    summary = {
+        "identities": len(config["identities"]),
+        "actors": len(config["actors"]),
+        "spaces": len(config["spaces"]),
+        "conversations": len(config["conversations"]),
+        "unmapped_namespaces": sum(1 for item in inventory if not item["mapped"]),
+    }
+    return {"identity_scope": config, "namespace_inventory": inventory, "summary": summary}
+
+
+@app.get("/api/identity-scope")
+def get_identity_scope() -> dict[str, Any]:
+    return identity_scope_payload()
+
+
+@app.post("/api/identity-scope")
+def update_identity_scope(req: IdentityScopeRequest, request: Request) -> dict[str, Any]:
+    require_admin(request)
+    data = load_dashboard_settings()
+    data["identity_scope"] = normalise_identity_scope_config(req.identity_scope)
+    save_dashboard_settings(data)
+    return identity_scope_payload()
 
 @app.get("/api/settings")
 def get_settings(request: Request) -> dict[str, Any]:

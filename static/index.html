@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>YantrikDB Dashboard</title>
   <link rel="icon" href="/static/assets/favicon.svg?v=yantrikdb-white-favicon-2" type="image/svg+xml">
-  <link rel="stylesheet" href="/static/styles.css?v=impeccable-polish-9" />
+  <link rel="stylesheet" href="/static/styles.css?v=impeccable-polish-10" />
 </head>
 <body>
   <div class="grain"></div>
@@ -27,6 +27,7 @@
       <button class="nav-item" data-view="recall">Recall</button>
       <button class="nav-item" data-view="conflicts">Contradictions</button>
       <button class="nav-item" data-view="graph">Entity Graph</button>
+      <button class="nav-item" data-view="identity-scope">Identity &amp; Scope</button>
       <button class="nav-item" data-view="lifecycle">Lifecycle</button>
       <button class="nav-item" data-view="ops">Maintenance</button>
       <button class="nav-item" data-view="settings">Settings</button>
@@ -167,6 +168,49 @@
       <div class="panel"><div class="panel-head"><h2>Related memories</h2><span class="muted">entity evidence</span></div><div id="graphMemories" class="memory-list"></div></div>
     </section>
 
+
+    <section id="view-identity-scope" class="view">
+      <div class="identity-hero panel">
+        <div>
+          <div class="label">Memory governance</div>
+          <h2>Identity &amp; Scope</h2>
+          <p class="page-copy">Map raw platform actors to canonical identities, then route conversations into private or shared memory scopes.</p>
+        </div>
+        <div id="identityScopeSummary" class="identity-summary" aria-label="Identity and scope summary"></div>
+      </div>
+      <div class="scope-grid">
+        <div class="panel scope-panel">
+          <div class="panel-head"><h2>Identities</h2><span class="muted">canonical people</span></div>
+          <div id="identityList" class="scope-list"></div>
+        </div>
+        <div class="panel scope-panel">
+          <div class="panel-head"><h2>Actors</h2><span class="muted">platform IDs</span></div>
+          <div id="actorList" class="scope-list"></div>
+        </div>
+        <div class="panel scope-panel">
+          <div class="panel-head"><h2>Shared scopes</h2><span class="muted">groups and spaces</span></div>
+          <div id="spaceList" class="scope-list"></div>
+        </div>
+        <div class="panel scope-panel">
+          <div class="panel-head"><h2>Conversation routing</h2><span class="muted">chat → memory scope</span></div>
+          <div id="conversationList" class="scope-list"></div>
+        </div>
+      </div>
+      <div class="panel">
+        <div class="panel-head"><h2>Namespace coverage</h2><span class="muted">spot unmapped scopes</span></div>
+        <div id="identityNamespaceTable" class="table-wrap"></div>
+      </div>
+      <div class="panel advanced-panel">
+        <div class="panel-head"><h2>Advanced config</h2><span class="muted">JSON editor</span></div>
+        <p class="page-copy">Edit the registry as generic JSON. Saving requires Admin Mode and updates dashboard settings only.</p>
+        <textarea id="identityScopeJson" class="json-editor" spellcheck="false" aria-label="Identity and scope JSON"></textarea>
+        <div class="toolbar compact">
+          <button id="reloadIdentityScope" class="btn secondary">Reload</button>
+          <button id="saveIdentityScope" class="btn primary">Save registry</button>
+        </div>
+      </div>
+    </section>
+
     <section id="view-lifecycle" class="view">
       <div class="grid stats" id="lifecycleCards"></div>
       <div class="two-col">
@@ -276,6 +320,6 @@
       <div class="modal-actions"><button id="confirmCancel" class="btn secondary">Cancel</button><button id="confirmOk" class="btn primary">Continue</button></div>
     </div>
   </div>
-  <script src="/static/app.js?v=impeccable-polish-9"></script>
+  <script src="/static/app.js?v=impeccable-polish-10"></script>
 </body>
 </html>
