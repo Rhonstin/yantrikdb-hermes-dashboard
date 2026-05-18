@@ -2,6 +2,7 @@ const $ = (s) => document.querySelector(s);
 const $$ = (s) => [...document.querySelectorAll(s)];
 const state = { health:null, stats:null, settings:null, namespace:'', view:'overview', memoryOffset:0, selectedMemory:null };
 const VALID_VIEWS = new Set(['overview','visualiser','memories','recall','conflicts','graph','lifecycle','ops','settings']);
+const ALL_NAMESPACES = '__all__';
 const DEFAULT_VIZ_CAMERA = { rotation:.55, tilt:.78, zoom:1, panX:0, panY:0 };
 const viz = { frame:0, nodes:[], edges:[], byId:{}, stars:[], data:null, mode:'constellation', paused:false, interaction:'rotate', drag:null, lastFrameTime:0, ...DEFAULT_VIZ_CAMERA };
 
@@ -17,20 +18,22 @@ async function api(path, opts={}){
   if(!res.ok) throw new Error(data.detail || data.error || res.statusText);
   return data;
 }
-function ns(){ return $('#namespaceSelect').value || state.namespace; }
+function ns(){ return $('#memoryNamespaceFilter')?.value || $('#namespaceSelect')?.value || state.namespace; }
+function setNamespace(value){ const v=value || state.namespace; if($('#namespaceSelect')) $('#namespaceSelect').value=v; if($('#memoryNamespaceFilter')) $('#memoryNamespaceFilter').value=v; }
 function syncMemoryFiltersFromUrl(params=new URLSearchParams(location.search)){
   if(params.has('q')) $('#memorySearch').value=params.get('q')||'';
   if(params.has('status')) $('#statusFilter').value=params.get('status')||'active';
   if(params.has('domain')) $('#domainFilter').value=params.get('domain')||'';
   if(params.has('source')) $('#sourceFilter').value=params.get('source')||'';
   if(params.has('sort')) $('#sortFilter').value=params.get('sort')||'created_at';
+  if(params.has('namespace')) setNamespace(params.get('namespace') || state.namespace);
 }
 function routeUrlFor(view){
   const url=new URL(location.href); url.searchParams.set('view',view); url.searchParams.delete('memory');
   ['q','status','domain','source','sort'].forEach(k=>url.searchParams.delete(k));
   if(view==='memories'){
-    const vals={q:$('#memorySearch')?.value||'',status:$('#statusFilter')?.value||'active',domain:$('#domainFilter')?.value||'',source:$('#sourceFilter')?.value||'',sort:$('#sortFilter')?.value||'created_at'};
-    for(const [k,v] of Object.entries(vals)) if(v && !(['status','sort'].includes(k) && ['active','created_at'].includes(v))) url.searchParams.set(k,v);
+    const vals={namespace:ns(),q:$('#memorySearch')?.value||'',status:$('#statusFilter')?.value||'active',domain:$('#domainFilter')?.value||'',source:$('#sourceFilter')?.value||'',sort:$('#sortFilter')?.value||'created_at'};
+    for(const [k,v] of Object.entries(vals)) if(v && !(['status','sort','namespace'].includes(k) && ['active','created_at',state.namespace].includes(v))) url.searchParams.set(k,v);
   }
   return url;
 }
@@ -54,7 +57,7 @@ function setView(view, opts={}){
   $$('.nav-item').forEach(b=>b.classList.toggle('active', b.dataset.view===view));
   document.body.classList.remove('menu-open');
   $('#menuToggle')?.setAttribute('aria-expanded','false');
-  const names={overview:'Memory Operations',visualiser:'Visualiser',memories:'Memory Browser',recall:'Recall Debugger',conflicts:'Contradiction Detection',graph:'Entity Graph',lifecycle:'Decay & Proactive Triggers',ops:'Autonomous Cognition',settings:'Settings'};
+  const names={overview:'Memory Operations',visualiser:'Visualiser',memories:'Memory Browser',recall:'Recall',conflicts:'Contradictions',graph:'Entity Graph',lifecycle:'Lifecycle',ops:'Maintenance',settings:'Settings'};
   $('#pageTitle').textContent=names[view]||view;
   if(view!=='visualiser') stopVisualiser();
   if(view!=='memories') closeMemoryDetail({silent:true});
@@ -84,8 +87,11 @@ async function init(){
   document.addEventListener('keydown',(e)=>{ if(e.key==='Escape'){ document.body.classList.remove('menu-open'); $('#menuToggle')?.setAttribute('aria-expanded','false'); closeMemoryDetail({silent:true}); } });
   $('#closeMemoryDrawer')?.addEventListener('click',()=>closeMemoryDetail());
   $('#memoryDrawer')?.addEventListener('click',(e)=>{ if(e.target.id==='memoryDrawer') closeMemoryDetail(); });
-  $('#namespaceSelect').onchange=()=>refreshAll();
-  $('#memoryApply').onclick=()=>{state.memoryOffset=0; writeRoute('memories',{replace:true}); loadMemories();}; $('#runRecall').onclick=runRecall; $('#loadConflicts').onclick=loadConflicts;
+  $('#namespaceSelect').onchange=()=>{ setNamespace($('#namespaceSelect').value); refreshAll(); };
+  $('#memoryNamespaceFilter')?.addEventListener('change',()=>{ setNamespace($('#memoryNamespaceFilter').value); state.memoryOffset=0; writeRoute('memories',{replace:true}); refreshAll(); });
+  $('#memoryApply').onclick=()=>{state.memoryOffset=0; writeRoute('memories',{replace:true}); loadMemories();};
+  $('#memoryReset')?.addEventListener('click',()=>{ $('#memorySearch').value=''; $('#statusFilter').value='active'; $('#domainFilter').value=''; $('#sourceFilter').value=''; $('#sortFilter').value='created_at'; state.memoryOffset=0; writeRoute('memories',{replace:true}); loadMemories(); });
+  $('#runRecall').onclick=runRecall; $('#loadConflicts').onclick=loadConflicts;
   $('#threeRefresh')?.addEventListener('click',()=>loadVisualiser(true));
   $('#threeReset')?.addEventListener('click',()=>resetVisualiser());
   $('#threePanMode')?.addEventListener('click',()=>{ threeVis.panMode=!threeVis.panMode; updateThreeUI(); });
@@ -108,16 +114,39 @@ async function init(){
 }
 function updateAdminBadge(){ const on=!!(state.health?.admin_enabled||state.settings?.admin_mode); $('#adminBadge').textContent=on?'Admin Mode enabled':'Read-only'; $('#adminBadge').className=on?'pill warn':'pill neutral'; const ops=$('#opsAdminState'); if(ops){ops.textContent=on?'Admin Mode enabled':'Read-only'; ops.className=on?'pill warn':'pill neutral';} }
 
+function selectedNamespaceMeta(){
+  const current=ns();
+  const rows=state.health?.namespaces||[];
+  const total=rows.reduce((a,n)=>a+Number(n.count||0),0);
+  if(current===ALL_NAMESPACES) return {name:'All namespaces', count:total, all:true};
+  const found=rows.find(n=>n.namespace===current);
+  return {name:current || state.namespace, count:found?.count ?? null, all:false};
+}
+function updateScopeUi(){
+  const meta=selectedNamespaceMeta();
+  const count=meta.count===null?'':`${fmt(meta.count)} memor${Number(meta.count)===1?'y':'ies'}`;
+  $('#scopeName') && ($('#scopeName').textContent=meta.name);
+  $('#scopeCount') && ($('#scopeCount').textContent=count);
+  $('#scopeBar')?.classList.toggle('all-scope', !!meta.all);
+  $('#opsScopeName') && ($('#opsScopeName').textContent=meta.name);
+  $('#opsScopeCount') && ($('#opsScopeCount').textContent=count);
+  $('#opsScopeName')?.closest('.maintenance-scope')?.classList.toggle('all-scope', !!meta.all);
+  const db=$('#dbPath'); if(db) db.textContent=meta.all ? `${count} across all scopes` : `${count || 'No count'} · ${state.health?.db_path || ''}`;
+  if($('#settingsExportLink')) $('#settingsExportLink').href=`/api/export/memories.jsonl?namespace=${encodeURIComponent(ns())}&status=active`;
+}
 async function refreshAll(){
   state.health=await api('/api/health');
   state.settings=await api('/api/settings');
   state.namespace=state.health.default_namespace;
-  const sel=$('#namespaceSelect'); const prev=sel.value || state.namespace;
-  sel.innerHTML=(state.health.namespaces||[]).map(n=>`<option value="${esc(n.namespace)}">${esc(n.namespace)}</option>`).join('');
-  if(![...sel.options].some(o=>o.value===prev)) sel.insertAdjacentHTML('afterbegin',`<option value="${esc(prev)}">${esc(prev)}</option>`);
-  sel.value=prev;
-  $('#dbPath').textContent=state.health.db_path;
-  if($('#settingsExportLink')) $('#settingsExportLink').href=`/api/export/memories.jsonl?namespace=${encodeURIComponent(ns())}&status=active`;
+  const nsRows=state.health.namespaces||[];
+  const options=`<option value="${ALL_NAMESPACES}">All namespaces (${fmt(nsRows.reduce((a,n)=>a+Number(n.count||0),0))})</option>`+nsRows.map(n=>`<option value="${esc(n.namespace)}">${esc(n.namespace)} (${fmt(n.count)})</option>`).join('');
+  const sel=$('#namespaceSelect'); const memSel=$('#memoryNamespaceFilter'); const prev=(memSel?.value || sel?.value || state.namespace);
+  [sel,memSel].filter(Boolean).forEach(s=>{
+    s.innerHTML=options;
+    if(![...s.options].some(o=>o.value===prev)) s.insertAdjacentHTML('afterbegin',`<option value="${esc(prev)}">${esc(prev)}</option>`);
+    s.value=prev;
+  });
+  updateScopeUi();
   updateAdminBadge();
   await loadStats();
   if(state.view==='memories') await loadMemories();
@@ -132,7 +161,7 @@ async function loadSettings(){
   state.settings=await api('/api/settings');
   const toggle=$('#adminModeToggle'); if(toggle) toggle.checked=!!state.settings.admin_mode;
   const passwordState=$('#passwordState'); if(passwordState) passwordState.textContent=state.settings.password_enabled?'Password enabled. Changing or disabling it clears saved browser sessions.':'Password disabled.';
-  if($('#settingsExportLink')) $('#settingsExportLink').href=`/api/export/memories.jsonl?namespace=${encodeURIComponent(ns())}&status=active`;
+  updateScopeUi();
   $('#settingsRuntime').innerHTML=settingsRows(state.settings);
   updateAdminBadge();
 }
@@ -176,13 +205,15 @@ async function loadStats(){
   const active = engine.active_memories ?? (state.stats.memory_status||[]).find(x=>x.status==='active')?.count ?? 0;
   const consolidated = engine.consolidated_memories ?? (state.stats.memory_status||[]).find(x=>x.status==='consolidated')?.count ?? 0;
   const tomb = engine.tombstoned_memories ?? (state.stats.memory_status||[]).find(x=>x.status==='tombstoned')?.count ?? 0;
-  const metrics=[['Active',active],['Consolidated',consolidated],['Tombstoned',tomb],['Open conflicts',state.stats.open_conflicts],['Entities',state.stats.entities],['Edges',state.stats.edges],['DB size',humanBytes(state.health.db_size_bytes)],['Embedder',state.health.embedder]];
+  const metrics=[['Active',active],['Consolidated',consolidated],['Forgotten',tomb],['Open conflicts',state.stats.open_conflicts],['Entities',state.stats.entities],['Edges',state.stats.edges],['DB size',humanBytes(state.health.db_size_bytes)],['Embedder',state.health.embedder]];
   if($('#heroMetrics')) $('#heroMetrics').innerHTML=metrics.slice(0,4).map(m=>metric(m[0],m[1])).join('');
   $('#statsGrid').innerHTML=metrics.map(m=>`<div class="stat-card"><div class="stat-label">${esc(m[0])}</div><div class="stat-value">${esc(fmt(m[1]))}</div></div>`).join('');
   $('#composition').innerHTML=compositionBlock('Domains',state.stats.by_domain)+compositionBlock('Sources',state.stats.by_source)+compositionBlock('Types',state.stats.by_type);
   drawRecent(state.stats.recent_by_day||[]);
-  $('#namespaceTable').innerHTML=`<table><thead><tr><th>Namespace</th><th>Rows</th></tr></thead><tbody>${(state.health.namespaces||[]).map(n=>`<tr><td><code>${esc(n.namespace)}</code></td><td>${fmt(n.count)}</td></tr>`).join('')}</tbody></table>`;
+  $('#namespaceTable').innerHTML=`<table><thead><tr><th>Memory scope</th><th>Rows</th></tr></thead><tbody>${(state.health.namespaces||[]).map(n=>`<tr><td><code>${esc(n.namespace)}</code></td><td>${fmt(n.count)}</td></tr>`).join('')}</tbody></table>`;
+  updateScopeUi();
 }
+
 function humanBytes(b){ if(!b) return '0 B'; const u=['B','KB','MB','GB']; let i=0; while(b>1024&&i<u.length-1){b/=1024;i++;} return `${b.toFixed(i?1:0)} ${u[i]}`; }
 function metric(label,value){return `<div class="metric"><div class="metric-label">${esc(label)}</div><div class="metric-value">${esc(fmt(value))}</div></div>`}
 function compositionBlock(title, arr){ const max=Math.max(1,...(arr||[]).map(x=>x.count)); return `<div class="detail-section"><div class="label">${title}</div>${(arr||[]).slice(0,8).map(x=>`<div class="bar-row"><span>${esc(x.domain||x.source||x.type||'—')}</span><div class="bar"><span style="width:${(x.count/max)*100}%"></span></div><b>${fmt(x.count)}</b></div>`).join('')}</div>`; }
@@ -261,7 +292,7 @@ function detailHtml(m){
     <div class="detail-content">${esc(m.text)}</div>
     <div class="drawer-actions">
       <button class="drawer-action primary" onclick="showSelectableCopy('RID','${rid}')">Copy RID</button>
-      <button class="drawer-action warn" onclick="forgetSelected('${rid}')">Forget / tombstone</button>
+      <button class="drawer-action warn" onclick="forgetSelected('${rid}')">Forget memory</button>
     </div>
     <div class="diag-grid">
       ${diag('RID', rid, true)}${diag('Namespace', m.namespace, true)}${diag('Source', m.source)}${diag('Type', m.type)}${diag('Importance', Number(m.importance||0).toFixed(3))}${diag('Certainty', Number(m.certainty||0).toFixed(3))}${diag('Access count', m.access_count)}${diag('Created', m.created_at_iso)}${diag('Updated', m.updated_at_iso)}${diag('Embedding bytes', m.embedding_bytes)}
@@ -274,9 +305,9 @@ function kv(k,v){return `<div>${esc(k)}</div><div>${esc(fmt(v))}</div>`}
 function arrSection(title, arr){ if(!arr||(Array.isArray(arr)&&!arr.length)||(typeof arr==='object'&&!Array.isArray(arr)&&!Object.keys(arr).length))return ''; return `<div class="detail-section"><div class="label">${title}</div><pre>${esc(JSON.stringify(arr,null,2))}</pre></div>`; }
 function showSelectableCopy(label,value){ const text=String(value||''); if(navigator.clipboard?.writeText){ navigator.clipboard.writeText(text).then(()=>toast(`${label} copied`)).catch(()=>toast(text)); } else { toast(text); } }
 function confirmAction(title,message){ return new Promise(resolve=>{ const modal=$('#confirmModal'); $('#confirmTitle').textContent=title; $('#confirmMessage').textContent=message; modal.classList.remove('hidden'); const done=v=>{modal.classList.add('hidden'); $('#confirmOk').onclick=null; $('#confirmCancel').onclick=null; resolve(v);}; $('#confirmOk').onclick=()=>done(true); $('#confirmCancel').onclick=()=>done(false); modal.onclick=e=>{ if(e.target===modal) done(false); }; }); }
-async function forgetSelected(rid){ if(!await confirmAction('Tombstone memory','This invalidates the selected memory and keeps it only for audit. Admin Mode must be enabled.'))return; try{ const out=await api(`/api/memory/${encodeURIComponent(rid)}/forget`,{method:'POST',body:'{}'}); toast('Forgot '+rid); await loadMemories(); $('#memoryDrawerBody').innerHTML=`<pre>${esc(JSON.stringify(out,null,2))}</pre>`;}catch(e){toast(e.message)} }
+async function forgetSelected(rid){ if(!await confirmAction('Forget this memory?','This removes the memory from active recall and keeps an audit record. Admin Mode must be enabled.'))return; try{ const out=await api(`/api/memory/${encodeURIComponent(rid)}/forget`,{method:'POST',body:'{}'}); toast('Memory forgotten'); await loadMemories(); $('#memoryDrawerBody').innerHTML=`<pre>${esc(JSON.stringify(out,null,2))}</pre>`;}catch(e){toast(e.message)} }
 
-async function runRecall(){ const body={query:$('#recallQuery').value,top_k:Number($('#recallTopK').value||10),namespace:ns(),domain:$('#recallDomain').value||null,source:$('#recallSource').value||null,include_consolidated:$('#recallConsolidated').checked,expand_entities:$('#recallGraph').checked}; const data=await api('/api/recall',{method:'POST',body:JSON.stringify(body)}); const results=data.results||data.items||[]; $('#recallResults').innerHTML=`<div class="panel"><div class="panel-head"><h3>Result payload</h3><span class="muted">${fmt(results.length)} hits</span></div></div>`+results.map((r,i)=>`<div class="recall-card"><div class="panel-head"><h3>#${i+1} ${esc(r.domain||r.type||'memory')}</h3><div class="recall-score">${Number(r.score||r.similarity||0).toFixed(3)}</div></div><p>${esc(r.text||r.content||JSON.stringify(r).slice(0,500))}</p><div class="meta-row">${(r.why_retrieved||r.reasons||[]).map(x=>`<span class="pill good">${esc(x)}</span>`).join('')}<span class="pill">${esc(r.rid||'')}</span></div><pre>${esc(JSON.stringify(r,null,2))}</pre></div>`).join('') || `<div class="empty">No recall results.</div>`; }
+async function runRecall(){ const body={query:$('#recallQuery').value,top_k:Number($('#recallTopK').value||10),namespace:ns(),domain:$('#recallDomain').value||null,source:$('#recallSource').value||null,include_consolidated:$('#recallConsolidated').checked,expand_entities:$('#recallGraph').checked}; const data=await api('/api/recall',{method:'POST',body:JSON.stringify(body)}); const results=data.results||data.items||[]; $('#recallResults').innerHTML=`<div class="panel"><div class="panel-head"><h2>Results</h2><span class="muted">${fmt(results.length)} hits</span></div></div>`+results.map((r,i)=>`<div class="recall-card"><div class="panel-head"><h2>#${i+1} ${esc(r.domain||r.type||'memory')}</h2><div class="recall-score">${Number(r.score||r.similarity||0).toFixed(3)}</div></div><p>${esc(r.text||r.content||JSON.stringify(r).slice(0,500))}</p><div class="meta-row">${(r.why_retrieved||r.reasons||[]).map(x=>`<span class="pill good">${esc(x)}</span>`).join('')}<span class="pill">${esc(r.rid||'')}</span></div><pre>${esc(JSON.stringify(r,null,2))}</pre></div>`).join('') || `<div class="empty">No recall results.</div>`; }
 
 async function loadConflicts(){ const data=await api(`/api/conflicts?namespace=${encodeURIComponent(ns())}&status=${encodeURIComponent($('#conflictStatus').value)}`); $('#conflictList').innerHTML=(data.items||[]).map(c=>`<div class="memory-item" data-id="${esc(c.conflict_id||c.id)}"><div class="memory-title">${esc(c.conflict_type||c.type||'conflict')} <span class="muted">${esc(c.status||'open')}</span></div><div class="memory-text">${esc(c.description||c.summary||JSON.stringify(c).slice(0,220))}</div><div class="meta-row"><span class="pill warn">priority ${esc(c.priority||'—')}</span><span class="pill">${esc(c.entity||'')}</span></div></div>`).join('') || '<div class="empty">No conflicts.</div>'; $$('#conflictList .memory-item').forEach(el=>el.onclick=()=>selectConflict(el.dataset.id)); }
 async function selectConflict(id){ const c=await api('/api/conflicts/'+encodeURIComponent(id)); $('#conflictDetail').innerHTML=`<div class="detail"><h2>Conflict ${esc(id)}</h2><pre>${esc(JSON.stringify(c,null,2))}</pre><div class="detail-section"><div class="label">Resolve</div><div class="toolbar compact"><select id="resolveStrategy"><option value="dismiss">dismiss</option><option value="keep_winner">keep_winner</option><option value="merge">merge</option><option value="keep_both">keep_both</option></select><input id="winnerRid" placeholder="winner rid"><input id="newText" placeholder="merged text"><button class="btn primary" onclick="resolveConflict('${esc(id)}')">Resolve</button></div></div></div>`; }
@@ -284,10 +315,10 @@ async function resolveConflict(id){ try{ const body={strategy:$('#resolveStrateg
 
 async function loadEntities(){ const data=await api(`/api/entities?q=${encodeURIComponent($('#entitySearch').value)}&limit=80`); $('#entityList').innerHTML=(data.items||[]).map(e=>`<div class="memory-item" data-name="${esc(e.name||e.entity||'')}"><div class="memory-title">${esc(e.name||e.entity)}</div><div class="meta-row"><span class="pill">${esc(e.entity_type||e.type||'entity')}</span><span class="pill">mentions ${fmt(e.mention_count||e.count||0)}</span></div></div>`).join('') || '<div class="empty helpful-empty"><strong>No entity index yet.</strong><span>Your current YantrikDB has memories, but no populated entity/edge rows. Use Recall Debugger for text search until relationships are written.</span></div>'; $$('#entityList .memory-item').forEach(el=>el.onclick=()=>{ $('#graphEntity').value=el.dataset.name; loadGraph(el.dataset.name); }); }
 async function loadGraph(entity){ if(!entity){toast('Enter/select entity');return;} const data=await api('/api/graph/'+encodeURIComponent(entity)+`?namespace=${encodeURIComponent(ns())}`); const empty=!(data.nodes?.length||data.edges?.length||data.memories?.length); $('#graphMeta').textContent=empty?`No graph data for ${entity}`:`${data.nodes.length} nodes · ${data.edges.length} edges`; drawGraph(data); $('#graphMemories').innerHTML=empty?'<div class="empty helpful-empty"><strong>No related memories for this entity.</strong><span>This graph only uses explicit YantrikDB entity links/relationship edges. Try Recall Debugger if you want normal semantic search.</span></div>':(data.memories||[]).map(memoryItem).join(''); }
-function drawGraph(g){ const svg=$('#graphSvg'); svg.innerHTML=''; const w=760,h=420,cx=w/2,cy=h/2; if(!(g.nodes?.length||g.edges?.length||g.memories?.length)){ svg.insertAdjacentHTML('beforeend',`<text class="graph-label graph-empty-label" x="${cx}" y="${cy}" text-anchor="middle">No entity graph data yet</text><text class="graph-label graph-empty-sub" x="${cx}" y="${cy+28}" text-anchor="middle">Use Recall Debugger for normal memory search</text>`); return; } const nodes=g.nodes.length?g.nodes:[{id:g.entity,label:g.entity}]; const pos={}; nodes.forEach((n,i)=>{ if(n.id===g.entity||i===0) pos[n.id]=[cx,cy]; else {const a=(i-1)/Math.max(1,nodes.length-1)*Math.PI*2; pos[n.id]=[cx+Math.cos(a)*260, cy+Math.sin(a)*150];}}); g.edges.forEach(e=>{const a=pos[e.source]||[cx,cy], b=pos[e.target]||[cx,cy]; svg.insertAdjacentHTML('beforeend',`<line class="graph-edge" x1="${a[0]}" y1="${a[1]}" x2="${b[0]}" y2="${b[1]}"/>`);}); nodes.forEach(n=>{const p=pos[n.id]; const root=n.id===g.entity||n.label===g.entity; svg.insertAdjacentHTML('beforeend',`<g><circle class="graph-node ${root?'graph-root':''}" cx="${p[0]}" cy="${p[1]}" r="${root?34:24}"></circle><text class="graph-label" x="${p[0]}" y="${p[1]+44}" text-anchor="middle">${esc(String(n.label||n.id).slice(0,22))}</text></g>`);}); }
+function drawGraph(g){ const svg=$('#graphSvg'); svg.innerHTML=''; const w=760,h=420,cx=w/2,cy=h/2; if(!(g.nodes?.length||g.edges?.length||g.memories?.length)){ svg.insertAdjacentHTML('beforeend',`<text class="graph-label graph-empty-label" x="${cx}" y="${cy}" text-anchor="middle">No entity graph data yet</text><text class="graph-label graph-empty-sub" x="${cx}" y="${cy+28}" text-anchor="middle">Use Recall for normal memory search</text>`); return; } const nodes=g.nodes.length?g.nodes:[{id:g.entity,label:g.entity}]; const pos={}; nodes.forEach((n,i)=>{ if(n.id===g.entity||i===0) pos[n.id]=[cx,cy]; else {const a=(i-1)/Math.max(1,nodes.length-1)*Math.PI*2; pos[n.id]=[cx+Math.cos(a)*260, cy+Math.sin(a)*150];}}); g.edges.forEach(e=>{const a=pos[e.source]||[cx,cy], b=pos[e.target]||[cx,cy]; svg.insertAdjacentHTML('beforeend',`<line class="graph-edge" x1="${a[0]}" y1="${a[1]}" x2="${b[0]}" y2="${b[1]}"/>`);}); nodes.forEach(n=>{const p=pos[n.id]; const root=n.id===g.entity||n.label===g.entity; svg.insertAdjacentHTML('beforeend',`<g><circle class="graph-node ${root?'graph-root':''}" cx="${p[0]}" cy="${p[1]}" r="${root?34:24}"></circle><text class="graph-label" x="${p[0]}" y="${p[1]+44}" text-anchor="middle">${esc(String(n.label||n.id).slice(0,22))}</text></g>`);}); }
 
 async function loadLifecycle(){ const [stale,upcoming,patterns,triggers]=await Promise.all([api(`/api/stale?namespace=${encodeURIComponent(ns())}`),api(`/api/upcoming?namespace=${encodeURIComponent(ns())}`),api('/api/patterns'),api('/api/triggers')]); $('#lifecycleCards').innerHTML=[['Stale candidates',stale.items?.length||0],['Upcoming',upcoming.items?.length||0],['Patterns',patterns.items?.length||0],['Triggers',triggers.items?.length||0]].map(m=>`<div class="stat-card"><div class="stat-label">${m[0]}</div><div class="stat-value">${fmt(m[1])}</div></div>`).join(''); $('#staleList').innerHTML=(stale.items||[]).map(memoryItem).join('')||'<div class="empty">No stale memories.</div>'; $('#upcomingList').innerHTML=(upcoming.items||[]).map(memoryItem).join('')||'<div class="empty">No upcoming memories.</div>'; $('#patternList').innerHTML=(patterns.items||[]).map(x=>`<div class="memory-item"><div class="memory-title">${esc(x.pattern_type||x.type||'pattern')}</div><pre>${esc(JSON.stringify(x,null,2))}</pre></div>`).join('')||'<div class="empty">No patterns.</div>'; $('#triggerList').innerHTML=(triggers.items||[]).map(x=>`<div class="memory-item"><div class="memory-title">${esc(x.trigger_type||x.type||'trigger')}</div><pre>${esc(JSON.stringify(x,null,2))}</pre></div>`).join('')||'<div class="empty">No triggers.</div>'; }
-async function runThink(){ if(!await confirmAction('Run think()','This may consolidate, resolve, or update memory metadata. Admin Mode must be enabled.'))return; try{ const out=await api('/api/think',{method:'POST',body:JSON.stringify({run_consolidation:true,run_conflict_scan:true,run_pattern_mining:false,run_personality:false})}); $('#opsOutput').textContent=JSON.stringify(out,null,2); await loadStats(); }catch(e){$('#opsOutput').textContent=e.message; toast(e.message);} }
+async function runThink(){ if(!await confirmAction('Run maintenance pass?','This will run housekeeping on the selected memory scope. Admin Mode must be enabled.'))return; const btn=$('#runThink'); const oldText=btn?.textContent; try{ if(btn){btn.disabled=true;btn.textContent='Running…';} $('#opsDetails')?.setAttribute('open',''); $('#opsOutput').textContent='Running maintenance…'; const out=await api('/api/think',{method:'POST',body:JSON.stringify({run_consolidation:true,run_conflict_scan:true,run_pattern_mining:false,run_personality:false})}); $('#opsOutput').textContent=JSON.stringify(out,null,2); toast('Maintenance complete'); await loadStats(); }catch(e){$('#opsDetails')?.setAttribute('open',''); $('#opsOutput').textContent=e.message; toast(e.message);} finally{ if(btn){btn.disabled=false;btn.textContent=oldText||'Run pass';} } }
 async function loadHealthPanel(){ const h=await api('/api/health'); $('#healthPayload').textContent=JSON.stringify(h,null,2); }
 
 
@@ -347,8 +378,9 @@ function updateThreeUI(){
   const help = $('#threeHelp'); if(help) help.textContent = threeVis.mode === 'neural'
     ? (window.matchMedia('(max-width: 760px)').matches ? 'Drag to orbit · Pan mode to move · pinch to zoom · tap a neuron.' : 'Drag to orbit the neural cloud · Pan mode/Shift-drag to pan · wheel/pinch to zoom.')
     : 'Drag to rotate · Pan mode/Shift-drag to pan · wheel/pinch to zoom.';
-  const pause = $('#threePause'); if(pause) pause.textContent = threeVis.paused ? (threeVis.mode === 'neural' ? 'Resume drift' : 'Resume rotation') : (threeVis.mode === 'neural' ? 'Pause drift' : 'Pause rotation');
-  const pan = $('#threePanMode'); if(pan) pan.textContent = threeVis.panMode ? 'Orbit mode' : 'Pan mode';
+  const compact = window.matchMedia('(max-width: 760px)').matches;
+  const pause = $('#threePause'); if(pause) pause.textContent = threeVis.paused ? (compact ? 'Resume' : (threeVis.mode === 'neural' ? 'Resume drift' : 'Resume rotation')) : (compact ? 'Pause' : (threeVis.mode === 'neural' ? 'Pause drift' : 'Pause rotation'));
+  const pan = $('#threePanMode'); if(pan) pan.textContent = threeVis.panMode ? (compact ? 'Orbit' : 'Orbit mode') : (compact ? 'Pan' : 'Pan mode');
 }
 function resetThreeCamera(){ Object.assign(threeVis, { yaw: threeVis.mode === 'neural' ? .12 : .70, pitch: threeVis.mode === 'neural' ? .10 : .96, cameraZ: threeVis.mode === 'neural' ? 600 : 760, panX:0, panY: threeVis.mode === 'neural' ? -10 : -84, lastT:0 }); }
 function clearThreeScene(){

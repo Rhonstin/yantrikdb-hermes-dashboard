@@ -93,3 +93,38 @@ def test_disabling_password_clears_cookie_and_opens_api(tmp_path, monkeypatch):
     assert response.status_code == 200
     assert "yantrikdb_dashboard_session" in response.headers.get("set-cookie", "")
     assert client.get("/api/settings").status_code == 200
+
+
+def test_memories_all_namespaces_sql_filter(tmp_path, monkeypatch):
+    db_path = tmp_path / "yantrikdb.db"
+    import sqlite3
+
+    with sqlite3.connect(db_path) as conn:
+        conn.execute("""
+            CREATE TABLE memories (
+                rid TEXT PRIMARY KEY, type TEXT, text TEXT, created_at REAL, updated_at REAL,
+                importance REAL, half_life REAL, last_access REAL, access_count INTEGER,
+                valence REAL, consolidated_into TEXT, consolidation_status TEXT,
+                storage_tier TEXT, metadata TEXT, namespace TEXT, certainty REAL,
+                domain TEXT, source TEXT, emotional_state TEXT, session_id TEXT,
+                due_at REAL, temporal_kind TEXT, tombstone_reason TEXT,
+                embedding_model TEXT, embedding BLOB
+            )
+        """)
+        rows = [
+            ("r1", "semantic", "alpha", 2, 2, .8, None, 2, 0, None, None, "active", None, "{}", "ns:a", .8, "general", "user", None, None, None, None, None, None, None),
+            ("r2", "semantic", "beta", 1, 1, .5, None, 1, 0, None, None, "active", None, "{}", "ns:b", .5, "general", "user", None, None, None, None, None, None, None),
+        ]
+        conn.executemany("INSERT INTO memories VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)", rows)
+
+    monkeypatch.setattr(dashboard, "DB_PATH", db_path)
+    result = dashboard.memories(namespace="__all__", status="active", limit=10, offset=0)
+    assert result["total"] == 2
+    assert {item["namespace"] for item in result["items"]} == {"ns:a", "ns:b"}
+
+
+def test_index_has_memory_namespace_filter_and_maintenance_label():
+    html = (Path(dashboard.STATIC_DIR) / "index.html").read_text()
+    assert "memoryNamespaceFilter" in html
+    assert "Maintenance" in html
+    assert "think()</button>" not in html

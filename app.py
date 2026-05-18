@@ -90,6 +90,16 @@ def table_exists(name: str) -> bool:
     return bool(one("SELECT name FROM sqlite_master WHERE type='table' AND name=?", (name,)))
 
 
+def is_all_namespaces(namespace: str | None) -> bool:
+    return str(namespace or "").strip().lower() in {"", "__all__", "all", "*"}
+
+
+def namespace_clause(column: str, namespace: str | None) -> tuple[list[str], list[Any]]:
+    if is_all_namespaces(namespace):
+        return [], []
+    return [f"{column}=?"], [namespace or DEFAULT_NAMESPACE]
+
+
 def parse_json(raw: Any, default: Any = None) -> Any:
     if raw in (None, ""):
         return default
@@ -373,36 +383,47 @@ def auth_logout() -> Response:
 
 @app.get("/api/stats")
 def stats(namespace: str = Query(DEFAULT_NAMESPACE)) -> dict[str, Any]:
+    mem_ns_clauses, mem_ns_params = namespace_clause("namespace", namespace)
+    mem_where = " AND ".join(mem_ns_clauses) if mem_ns_clauses else "1=1"
     mem_counts = rows(
-        """
+        f"""
         SELECT consolidation_status status, COUNT(*) count
-        FROM memories WHERE namespace=? GROUP BY consolidation_status
+        FROM memories WHERE {mem_where} GROUP BY consolidation_status
         """,
-        (namespace,),
+        tuple(mem_ns_params),
     ) if table_exists("memories") else []
     by_domain = rows(
-        "SELECT domain, COUNT(*) count FROM memories WHERE namespace=? GROUP BY domain ORDER BY count DESC LIMIT 20",
-        (namespace,),
-    )
+        f"SELECT domain, COUNT(*) count FROM memories WHERE {mem_where} GROUP BY domain ORDER BY count DESC LIMIT 20",
+        tuple(mem_ns_params),
+    ) if table_exists("memories") else []
     by_source = rows(
-        "SELECT source, COUNT(*) count FROM memories WHERE namespace=? GROUP BY source ORDER BY count DESC LIMIT 20",
-        (namespace,),
-    )
+        f"SELECT source, COUNT(*) count FROM memories WHERE {mem_where} GROUP BY source ORDER BY count DESC LIMIT 20",
+        tuple(mem_ns_params),
+    ) if table_exists("memories") else []
     by_type = rows(
-        "SELECT type, COUNT(*) count FROM memories WHERE namespace=? GROUP BY type ORDER BY count DESC",
-        (namespace,),
-    )
+        f"SELECT type, COUNT(*) count FROM memories WHERE {mem_where} GROUP BY type ORDER BY count DESC",
+        tuple(mem_ns_params),
+    ) if table_exists("memories") else []
     recent = rows(
-        "SELECT date(created_at, 'unixepoch', 'localtime') day, COUNT(*) count FROM memories WHERE namespace=? GROUP BY day ORDER BY day DESC LIMIT 30",
-        (namespace,),
-    )
+        f"SELECT date(created_at, 'unixepoch', 'localtime') day, COUNT(*) count FROM memories WHERE {mem_where} GROUP BY day ORDER BY day DESC LIMIT 30",
+        tuple(mem_ns_params),
+    ) if table_exists("memories") else []
     conflicts = one("SELECT COUNT(*) count FROM conflicts WHERE COALESCE(status,'open') IN ('open','active','')") if table_exists("conflicts") else {"count": 0}
     entities = one("SELECT COUNT(*) count FROM entities") if table_exists("entities") else {"count": 0}
     edges = one("SELECT COUNT(*) count FROM edges") if table_exists("edges") else {"count": 0}
-    try:
-        engine_stats = engine().stats(namespace=namespace)
-    except Exception as e:
-        engine_stats = {"error": str(e)}
+    if is_all_namespaces(namespace):
+        by_status = {str(x.get("status") or "active"): int(x.get("count") or 0) for x in mem_counts}
+        engine_stats = {
+            "active_memories": by_status.get("active", 0),
+            "consolidated_memories": by_status.get("consolidated", 0),
+            "tombstoned_memories": by_status.get("tombstoned", 0),
+            "scope": "all_namespaces_sql",
+        }
+    else:
+        try:
+            engine_stats = engine().stats(namespace=namespace)
+        except Exception as e:
+            engine_stats = {"error": str(e)}
     return {
         "namespace": namespace,
         "memory_status": mem_counts,
@@ -429,8 +450,7 @@ def memories(
     offset: int = Query(0, ge=0),
     sort: str = "created_at",
 ) -> dict[str, Any]:
-    clauses = ["namespace=?"]
-    params: list[Any] = [namespace]
+    clauses, params = namespace_clause("namespace", namespace)
     if status and status != "all":
         clauses.append("consolidation_status=?")
         params.append(status)
@@ -447,7 +467,7 @@ def memories(
         clauses.append("(text LIKE ? OR rid LIKE ? OR domain LIKE ? OR source LIKE ? OR type LIKE ?)")
         like = f"%{q}%"
         params.extend([like, like, like, like, like])
-    where = " AND ".join(clauses)
+    where = " AND ".join(clauses) if clauses else "1=1"
     sort_col = sort if sort in {"created_at", "updated_at", "last_access", "importance", "access_count", "certainty"} else "created_at"
     total = one(f"SELECT COUNT(*) count FROM memories WHERE {where}", tuple(params)) or {"count": 0}
     data = rows(
@@ -483,8 +503,8 @@ def memory_detail(rid: str) -> dict[str, Any]:
 
 def sql_recall_fallback(query: str, namespace: str, limit: int, domain: str | None = None, source: str | None = None) -> list[dict[str, Any]]:
     """FTS/LIKE fallback so the debugger is useful even if vector recall has no hits."""
-    clauses = ["m.namespace=?", "m.consolidation_status='active'"]
-    params: list[Any] = [namespace]
+    clauses, params = namespace_clause("m.namespace", namespace)
+    clauses.append("m.consolidation_status='active'")
     if domain:
         clauses.append("m.domain=?")
         params.append(domain)
@@ -524,7 +544,8 @@ def sql_recall_fallback(query: str, namespace: str, limit: int, domain: str | No
     for i, item in enumerate(data):
         clean = clean_row(item)
         clean["score"] = max(0.01, 1.0 - (i * 0.03))
-        clean["why_retrieved"] = ["fts5/keyword fallback", "same namespace", f"domain:{clean.get('domain')}"]
+        scope_reason = "all namespaces" if is_all_namespaces(namespace) else "same namespace"
+        clean["why_retrieved"] = ["fts5/keyword fallback", scope_reason, f"domain:{clean.get('domain')}"]
         out.append(clean)
     return out
 
@@ -535,6 +556,14 @@ def recall(req: RecallRequest) -> dict[str, Any]:
         raise HTTPException(400, "query required")
     namespace = req.namespace or DEFAULT_NAMESPACE
     top_k = max(1, min(req.top_k, 50))
+    if is_all_namespaces(namespace):
+        fallback = sql_recall_fallback(req.query, namespace, top_k, req.domain, req.source)
+        return {
+            "results": fallback,
+            "fallback": "fts5_keyword",
+            "namespace": "__all__",
+            "certainty_reasons": ["All-namespaces recall uses SQL/FTS fallback because YantrikDB semantic recall is namespace-scoped."],
+        }
     try:
         res = engine().recall_with_response(
             query=req.query,

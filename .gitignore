@@ -34,7 +34,8 @@ venv/
 # Node / frontend build
 node_modules/
 
-# Screenshots or private debug artifacts
+# Screenshots, critique snapshots, or private debug artifacts
+.impeccable/
 *.png
 *.jpg
 *.jpeg
