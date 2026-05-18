@@ -197,7 +197,7 @@ function compactJson(value){ return JSON.stringify(value||{}, null, 2); }
 function chip(label, value){ return `<div class="scope-chip"><span>${esc(label)}</span><strong>${esc(value || '—')}</strong></div>`; }
 function scopeEmpty(title, body){ return `<div class="empty helpful-empty"><strong>${esc(title)}</strong><span>${esc(body)}</span></div>`; }
 function sourceBadge(item){
-  const source=item.source==='yantrikdb_identity_map'?'Auto-detected':'Dashboard';
+  const source=item.source==='yantrikdb_identity_map'?'Auto-detected':(item.source==='namespace_inventory'?'Detected from memory bucket':'Dashboard');
   return `<span class="pill neutral">${esc(source)}</span>`;
 }
 function renderScopeRows(items, kind){
@@ -221,7 +221,8 @@ function renderScopeRows(items, kind){
     }
     if(kind==='actors'){
       const raw = `${item.platform||''}:${item.actor_id||''}`;
-      pieces.push(chip('Platform', item.platform), chip('Actor ID', item.actor_id), chip('Belongs to', item.identity));
+      pieces.push(chip('Platform', item.platform), chip('Actor ID', item.actor_id), chip('Belongs to', item.identity || 'Unassigned'));
+      if(item.alias) pieces.push(chip('Known alias', item.alias));
       if(item.source) pieces.push(sourceBadge(item));
       detail = item.legacy_scope ? `<details class="scope-technical"><summary>Technical namespace</summary><code>${esc(item.legacy_scope)}</code></details>` : '';
       actions = `<button class="btn tiny secondary" type="button" data-edit-actor="${esc(raw)}">Change owner</button>`;

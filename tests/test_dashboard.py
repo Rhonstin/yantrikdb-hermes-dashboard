@@ -287,6 +287,8 @@ def test_index_has_identity_scope_page_contract():
     assert "who each memory bucket belongs to" in html
     assert "Edit person" in js
     assert "Belongs to" in js
+    assert "Unassigned" in js
+    assert "Detected from memory bucket" in js
     assert "identity-scope" in js
     assert "/api/identity-scope" in js
     assert "addIdentityFromForm" in js
@@ -317,3 +319,26 @@ def test_identity_scope_api_imports_yantrikdb_identity_map(tmp_path, monkeypatch
     assert data["identity_scope"]["identities"][0]["id"] == "person-alpha"
     assert {a["platform"] for a in data["identity_scope"]["actors"]} == {"chat", "telegram"}
     assert all(item["mapped"] for item in data["namespace_inventory"])
+
+
+def test_identity_scope_api_detects_unassigned_actor_from_namespace(tmp_path, monkeypatch):
+    import sqlite3
+
+    db_path = tmp_path / "yantrikdb.db"
+    namespace = "hermes:hermes:default:owner:whatsapp-123456789-lid-abcdef123456"
+    with sqlite3.connect(db_path) as conn:
+        conn.execute("CREATE TABLE memories (rid TEXT PRIMARY KEY, namespace TEXT)")
+        conn.execute("INSERT INTO memories VALUES (?,?)", ("r1", namespace))
+    monkeypatch.setattr(dashboard, "DB_PATH", db_path)
+    monkeypatch.setattr(dashboard, "SETTINGS_PATH", tmp_path / "settings.json")
+    monkeypatch.setattr(dashboard, "YANTRIKDB_CONFIG_PATH", tmp_path / "missing-yantrikdb.json")
+    monkeypatch.setattr(dashboard, "WHATSAPP_SESSION_DIR", tmp_path / "wa-session")
+
+    data = TestClient(dashboard.app).get("/api/identity-scope").json()
+
+    actor = data["identity_scope"]["actors"][0]
+    assert actor["platform"] == "whatsapp"
+    assert actor["actor_id"] == "123456789@lid"
+    assert actor["identity"] == ""
+    assert actor["source"] == "namespace_inventory"
+    assert data["namespace_inventory"][0]["mapped"] is False

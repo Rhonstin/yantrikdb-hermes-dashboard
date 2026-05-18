@@ -37,6 +37,7 @@ BASE_NAMESPACE = os.environ.get("YANTRIKDB_NAMESPACE", "hermes")
 DEFAULT_NAMESPACE = os.environ.get("YANTRIKDB_DASHBOARD_NAMESPACE", f"{BASE_NAMESPACE}:hermes:default")
 SETTINGS_PATH = Path(os.environ.get("YANTRIKDB_DASHBOARD_SETTINGS_PATH") or (Path.home() / ".hermes" / "plugin-data" / "yantrikdb-dashboard" / "settings.json")).expanduser()
 YANTRIKDB_CONFIG_PATH = Path(os.environ.get("YANTRIKDB_CONFIG_PATH") or (Path.home() / ".hermes" / "yantrikdb.json")).expanduser()
+WHATSAPP_SESSION_DIR = Path(os.environ.get("HERMES_WHATSAPP_SESSION_DIR") or (Path.home() / ".hermes" / "whatsapp" / "session")).expanduser()
 
 
 def env_bool(name: str, default: bool = False) -> bool:
@@ -355,6 +356,31 @@ def owner_namespace_suffix(owner_id: str) -> str:
     return f"owner:{safe_namespace_part(owner_id)}"
 
 
+def actor_from_owner_namespace(namespace: str) -> str:
+    tail = str(namespace or "").split(":owner:", 1)[-1]
+    if tail.startswith("whatsapp-default-"):
+        return ""
+    match = re.match(r"whatsapp-(\d+)-lid-[0-9a-f]{12}$", tail)
+    if match:
+        return f"whatsapp:{match.group(1)}@lid"
+    match = re.match(r"telegram-(.+)-[0-9a-f]{12}$", tail)
+    if match:
+        return f"telegram:{match.group(1)}"
+    return ""
+
+
+def whatsapp_alias_for_lid(actor_id: str) -> str:
+    if not actor_id.endswith("@lid"):
+        return ""
+    lid = actor_id[:-4]
+    path = WHATSAPP_SESSION_DIR / f"lid-mapping-{lid}_reverse.json"
+    try:
+        alias = json.loads(path.read_text())
+        return str(alias) if alias else ""
+    except Exception:
+        return ""
+
+
 def load_yantrikdb_identity_scope_config() -> dict[str, list[dict[str, Any]]]:
     if not YANTRIKDB_CONFIG_PATH.exists():
         return default_identity_scope_config()
@@ -425,6 +451,28 @@ def identity_scope_payload() -> dict[str, Any]:
     stored = normalise_identity_scope_config(settings.get("identity_scope"))
     imported = load_yantrikdb_identity_scope_config()
     config = merge_identity_scope_config(stored, imported)
+    namespace_rows = rows("SELECT namespace, COUNT(*) count FROM memories GROUP BY namespace ORDER BY namespace") if table_exists("memories") else []
+    existing_actor_keys = {f"{a.get('platform')}:{a.get('actor_id')}" for a in config["actors"]}
+    for row in namespace_rows:
+        namespace = str(row["namespace"])
+        raw_actor = actor_from_owner_namespace(namespace)
+        if not raw_actor or raw_actor in existing_actor_keys:
+            continue
+        platform, actor_id = split_actor(raw_actor)
+        legacy_tail = namespace.split(":owner:", 1)[-1] if ":owner:" in namespace else ""
+        item = {
+            "platform": platform,
+            "actor_id": actor_id,
+            "identity": "",
+            "legacy_scope": f"owner:{legacy_tail}" if legacy_tail else "",
+            "source": "namespace_inventory",
+        }
+        if platform == "whatsapp":
+            alias = whatsapp_alias_for_lid(actor_id)
+            if alias:
+                item["alias"] = alias
+        config["actors"].append(item)
+        existing_actor_keys.add(raw_actor)
     scope_details: dict[str, dict[str, str]] = {}
 
     def remember_scope(scope: str, label: str, kind: str, source: str = "configured") -> None:
@@ -443,11 +491,12 @@ def identity_scope_payload() -> dict[str, Any]:
             remember_scope(str(ident["resolved_scope"]), label, "identity", str(ident.get("source") or "configured"))
     for actor in config["actors"]:
         raw_actor = f"{actor.get('platform')}:{actor.get('actor_id')}" if actor.get('platform') and actor.get('actor_id') else ""
-        label = identity_labels.get(str(actor.get("identity")), str(actor.get("identity") or "Unassigned"))
-        actor_label = f"{label} via {raw_actor}" if raw_actor else label
-        if raw_actor:
+        identity = str(actor.get("identity") or "")
+        label = identity_labels.get(identity, identity)
+        actor_label = f"{label} via {raw_actor}" if label and raw_actor else (raw_actor or "Unassigned actor")
+        if identity and raw_actor:
             remember_scope(owner_namespace_suffix(raw_actor), actor_label, "actor", str(actor.get("source") or "configured"))
-        if actor.get("legacy_scope"):
+        if identity and actor.get("legacy_scope"):
             remember_scope(str(actor["legacy_scope"]), actor_label, "actor", str(actor.get("source") or "configured"))
     for space in config["spaces"]:
         if space.get("scope"):
@@ -455,7 +504,6 @@ def identity_scope_payload() -> dict[str, Any]:
     for convo in config["conversations"]:
         if convo.get("scope"):
             remember_scope(str(convo["scope"]), str(convo.get("label") or convo.get("conversation_id") or convo["scope"]), "conversation_route", str(convo.get("source") or "configured"))
-    namespace_rows = rows("SELECT namespace, COUNT(*) count FROM memories GROUP BY namespace ORDER BY namespace") if table_exists("memories") else []
     inventory = []
     for row in namespace_rows:
         namespace = str(row["namespace"])
