@@ -573,9 +573,23 @@ def test_renamed_repo_metadata_uses_new_slug():
 
 def test_three_visualiser_inspector_actions_use_button_styles():
     js = Path("static/app.js").read_text()
-    assert 'id="threeMemory" class="btn primary tiny"' in js
-    assert 'id="threeSearch" class="btn secondary tiny"' in js
+    assert "const memoryId = overlay ? 'threeOverlayMemory' : 'threeMemory';" in js
+    assert "class=\"btn primary tiny\"" in js
+    assert "class=\"btn secondary tiny\"" in js
     assert 'id="threeSearch" class="tiny"' not in js
+
+
+def test_three_visualiser_fullscreen_overlay_is_inside_viewport():
+    html = Path("static/index.html").read_text()
+    css = Path("src/styles.css").read_text()
+    js = Path("static/app.js").read_text()
+    assert 'id="threeFullscreenInspector" class="three-fullscreen-inspector"' in html
+    assert html.index('id="threeFullscreenInspector"') < html.index('id="threeInspector"')
+    assert ".three-viewport:fullscreen .three-fullscreen-inspector.active" in css
+    assert "threeOverlayMemory" in js
+    assert "threeOverlaySearch" in js
+    assert "threeOverlayClose" in js
+    assert "three-fullscreen-inspector,.fullscreen-exit,.constellation-legend" in js
 
 
 def test_mobile_scope_and_visualiser_toolbar_css_is_compact():

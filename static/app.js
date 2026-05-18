@@ -123,6 +123,7 @@ async function init(){
   $('#threePause')?.addEventListener('click',()=>{ threeVis.paused=!threeVis.paused; updateThreeUI(); });
   $('#threeFullscreen')?.addEventListener('click',()=>$('#threeViewport')?.requestFullscreen?.());
   $('#threeExitFullscreen')?.addEventListener('click',()=>document.exitFullscreen?.());
+  document.addEventListener('fullscreenchange',()=>{ if(state.view==='visualiser') requestAnimationFrame(()=>resizeThree()); });
   $$('.visualiser-tabs button[data-three-mode]').forEach(b=>b.onclick=()=>setVisualiserMode(b.dataset.threeMode));
   $('#loadEntities').onclick=loadEntities; $('#loadGraph').onclick=()=>loadGraph($('#graphEntity').value||$('#entitySearch').value);
   $('#reloadIdentityScope')?.addEventListener('click',()=>loadIdentityScope()); $('#saveIdentityScope')?.addEventListener('click',()=>saveIdentityScope());
@@ -732,7 +733,8 @@ let threeModulePromise = null;
 let threeVis = {
   mode: 'constellation', data: null, renderer: null, scene: null, camera: null, group: null,
   nodes: [], edgePairs: [], labels: [], pulses: [], frame: 0, paused: false, panMode: false,
-  drag: null, pointer: new Map(), yaw: 0, pitch: 0.32, cameraZ: 780, panX: 0, panY: 0, lastT: 0
+  drag: null, pointer: new Map(), yaw: 0, pitch: 0.32, cameraZ: 780, panX: 0, panY: 0, lastT: 0,
+  selectedNode: null
 };
 function loadThreeModule(){
   if(!threeModulePromise) threeModulePromise = import('/static/vendor/three.module.min.js');
@@ -740,9 +742,40 @@ function loadThreeModule(){
 }
 function threeInspectorDefault(){
   const neural = threeVis.mode === 'neural';
-  const insp=$('#threeInspector'); if(!insp) return; insp.innerHTML = neural
+  threeVis.selectedNode = null;
+  const insp=$('#threeInspector'); if(insp) insp.innerHTML = neural
     ? `<div class="inspector-kicker">Neural inspector</div><h3>Nothing selected</h3><p class="muted">Pick a neuron hub, memory soma, or synapse to inspect the underlying read-only source.</p>`
     : `<div class="inspector-kicker">Constellation inspector</div><h3>Nothing selected</h3><p class="muted">Pick a star, memory, or link to inspect the underlying read-only source.</p>`;
+  hideThreeFullscreenInspector();
+}
+function hideThreeFullscreenInspector(){
+  const overlay = $('#threeFullscreenInspector');
+  if(!overlay) return;
+  overlay.classList.remove('active');
+  overlay.innerHTML = '';
+}
+function exitFullscreenThen(fn){
+  const run = () => { try { fn(); } catch(e) { toast(e.message || String(e)); } };
+  if(document.fullscreenElement) document.exitFullscreen().then(run).catch(run);
+  else run();
+}
+function threeInspectorMarkup(node, target='panel'){
+  const mode = threeVis.mode === 'neural' ? 'Neural Map 3D' : 'Constellation 3D';
+  const overlay = target === 'overlay';
+  const memoryId = overlay ? 'threeOverlayMemory' : 'threeMemory';
+  const searchId = overlay ? 'threeOverlaySearch' : 'threeSearch';
+  const close = overlay ? '<button id="threeOverlayClose" class="btn ghost tiny" aria-label="Close fullscreen inspector">Close</button>' : '';
+  const preview = node.preview ? `<p>${esc(node.preview)}</p>` : '';
+  return `<div class="inspector-kicker">${mode} · ${esc(node.kind || 'entity')}</div><h3>${esc(node.label)}</h3><p class="muted">${esc(node.category || 'Other')} · ${Number(node.count || 0).toLocaleString()} signal(s) · weight ${Number(node.weight || 0).toFixed(2)}</p>${preview}<div class="inspector-actions">${node.memory_id ? `<button id="${memoryId}" class="btn primary tiny">Open memory</button>` : ''}<button id="${searchId}" class="btn secondary tiny">Search this</button>${close}</div>`;
+}
+function bindThreeInspectorActions(node, target='panel'){
+  const overlay = target === 'overlay';
+  const memory = $(overlay ? '#threeOverlayMemory' : '#threeMemory');
+  const search = $(overlay ? '#threeOverlaySearch' : '#threeSearch');
+  const close = $('#threeOverlayClose');
+  if(memory) memory.onclick = () => exitFullscreenThen(() => selectMemory(node.memory_id));
+  if(search) search.onclick = () => exitFullscreenThen(() => visualiserSearchNode(node));
+  if(close) close.onclick = hideThreeFullscreenInspector;
 }
 function visualiserSearchNode(node){
   const rid = String(node.memory_id || '').trim();
@@ -754,10 +787,15 @@ function visualiserSearchNode(node){
   loadMemories().then(()=>{ if(rid) selectMemory(rid); }).catch(e=>toast(e.message));
 }
 function inspectThreeNode(node){
-  const mode = threeVis.mode === 'neural' ? 'Neural Map 3D' : 'Constellation 3D';
-  $('#threeInspector').innerHTML = `<div class="inspector-kicker">${mode} · ${esc(node.kind || 'entity')}</div><h3>${esc(node.label)}</h3><p class="muted">${esc(node.category || 'Other')} · ${Number(node.count || 0).toLocaleString()} signal(s) · weight ${Number(node.weight || 0).toFixed(2)}</p>${node.preview ? `<p>${esc(node.preview)}</p>` : ''}<div class="inspector-actions">${node.memory_id ? '<button id="threeMemory" class="btn primary tiny">Open memory</button>' : ''}<button id="threeSearch" class="btn secondary tiny">Search this</button></div>`;
-  if(node.memory_id) $('#threeMemory').onclick = () => selectMemory(node.memory_id);
-  $('#threeSearch').onclick = () => visualiserSearchNode(node);
+  threeVis.selectedNode = node;
+  $('#threeInspector').innerHTML = threeInspectorMarkup(node, 'panel');
+  bindThreeInspectorActions(node, 'panel');
+  const overlay = $('#threeFullscreenInspector');
+  if(overlay){
+    overlay.innerHTML = threeInspectorMarkup(node, 'overlay');
+    overlay.classList.add('active');
+    bindThreeInspectorActions(node, 'overlay');
+  }
 }
 function updateThreeUI(){
   $$('.visualiser-tabs button[data-three-mode]').forEach(b => b.classList.toggle('active', b.dataset.threeMode === threeVis.mode));
@@ -1370,7 +1408,7 @@ function bindThreeControls(){
     else { threeVis.drag=null; viewport.style.cursor='grab'; }
   };
   viewport.addEventListener('pointerup', end); viewport.addEventListener('pointercancel', end); viewport.addEventListener('pointerleave', end);
-  viewport.addEventListener('click', e=>{ if(viewport.dataset.suppressClick==='true'){ viewport.dataset.suppressClick='false'; return; } pickThreeNode(e); });
+  viewport.addEventListener('click', e=>{ if(e.target.closest('.three-fullscreen-inspector,.fullscreen-exit,.constellation-legend')) return; if(viewport.dataset.suppressClick==='true'){ viewport.dataset.suppressClick='false'; return; } pickThreeNode(e); });
 }
 function pickThreeNode(e){
   if(!threeVis.camera || !threeVis.group) return;
