@@ -606,7 +606,9 @@ def test_impeccable_surface_polish_removes_raw_black_and_quiets_mobile_config_ke
     assert "bg-black" not in css
     assert "border-black" not in css
     assert "ring-offset-black" not in css
+    assert "input[type=\"checkbox\"] { @apply relative h-5 w-5 min-w-5" in css
     assert "input[type=\"checkbox\"]:checked::after" in css
+    assert "@apply absolute left-1/2 top-1/2 h-4 w-4" in css
     assert "clip-path: polygon" in css
     assert ".config-name { @apply mt-1.5 text-[10px]; }" in css
     assert ".scope-status code { @apply mt-1; }" in css
