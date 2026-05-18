@@ -239,7 +239,8 @@ function renderScopeRows(items, kind){
       pieces.push(chip('Platform', item.platform), chip('Conversation', item.conversation_id), chip('Routes to', item.scope));
       actions = `<button class="btn tiny secondary" type="button" data-edit-conversation="${esc((item.platform||'')+':'+(item.conversation_id||''))}">Edit route</button>`;
     }
-    return `<div class="scope-card"><div class="scope-card-head"><strong>${esc(title)}</strong>${actions}</div><div class="scope-chip-row">${pieces.join('')}</div>${detail}</div>`;
+    const actorClass = kind==='actors' ? ' actor-card' : '';
+    return `<div class="scope-card${actorClass}"><div class="scope-card-head"><strong>${esc(title)}</strong>${actions}</div><div class="scope-chip-row">${pieces.join('')}</div>${detail}</div>`;
   }).join('');
 }
 function bindIdentityScopeRowActions(){
