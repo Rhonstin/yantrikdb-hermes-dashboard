@@ -51,7 +51,7 @@ def env_bool(name: str, default: bool = False) -> bool:
 
 ADMIN_MODE_ENV = env_bool("YANTRIKDB_DASHBOARD_ADMIN_MODE", False)
 
-app = FastAPI(title="YantrikDB for Hermes", version="0.1.1")
+app = FastAPI(title="YantrikDB for Hermes", version="0.1.2")
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["http://127.0.0.1", "http://localhost"],
