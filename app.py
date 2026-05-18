@@ -35,7 +35,9 @@ DEFAULT_DB = Path.home() / ".hermes" / "yantrikdb-memory.db"
 DB_PATH = Path(os.environ.get("YANTRIKDB_DB_PATH") or DEFAULT_DB).expanduser()
 BASE_NAMESPACE = os.environ.get("YANTRIKDB_NAMESPACE", "hermes")
 DEFAULT_NAMESPACE = os.environ.get("YANTRIKDB_DASHBOARD_NAMESPACE", f"{BASE_NAMESPACE}:hermes:default")
-SETTINGS_PATH = Path(os.environ.get("YANTRIKDB_DASHBOARD_SETTINGS_PATH") or (Path.home() / ".hermes" / "plugin-data" / "yantrikdb-dashboard" / "settings.json")).expanduser()
+DEFAULT_SETTINGS_PATH = Path.home() / ".hermes" / "plugin-data" / "yantrikdb-hermes-dashboard" / "settings.json"
+LEGACY_SETTINGS_PATH = Path.home() / ".hermes" / "plugin-data" / "yantrikdb-dashboard" / "settings.json"
+SETTINGS_PATH = Path(os.environ.get("YANTRIKDB_DASHBOARD_SETTINGS_PATH") or (LEGACY_SETTINGS_PATH if LEGACY_SETTINGS_PATH.exists() and not DEFAULT_SETTINGS_PATH.exists() else DEFAULT_SETTINGS_PATH)).expanduser()
 YANTRIKDB_CONFIG_PATH = Path(os.environ.get("YANTRIKDB_CONFIG_PATH") or (Path.home() / ".hermes" / "yantrikdb.json")).expanduser()
 WHATSAPP_SESSION_DIR = Path(os.environ.get("HERMES_WHATSAPP_SESSION_DIR") or (Path.home() / ".hermes" / "whatsapp" / "session")).expanduser()
 

@@ -541,8 +541,8 @@ def test_memory_status_active_uses_good_not_hot_pill():
 def test_readme_documents_hermes_plugin_install_and_no_admin_token():
     readme = Path("README.md").read_text()
     assert "# YantrikDB for Hermes Dashboard" in readme
-    assert "hermes plugins install wysie/yantrikdb-dashboard --enable" in readme
-    assert "hermes plugins update yantrikdb-dashboard" in readme
+    assert "hermes plugins install wysie/yantrikdb-hermes-dashboard --enable" in readme
+    assert "hermes plugins update yantrikdb-hermes-dashboard" in readme
     assert "There is no admin token to configure" in readme
     assert "Admin Mode" in readme
     assert "Dashboard password" in readme or "dashboard password" in readme
@@ -554,3 +554,13 @@ def test_product_metadata_uses_hermes_positioning():
     plugin = Path("plugin.yaml").read_text()
     assert "Hermes Agent memory operations" in plugin
     assert "author: wysie" in plugin
+
+
+def test_renamed_repo_metadata_uses_new_slug():
+    assert "name: yantrikdb-hermes-dashboard" in Path("plugin.yaml").read_text()
+    assert 'name = "yantrikdb-hermes-dashboard"' in Path("pyproject.toml").read_text()
+    readme = Path("README.md").read_text()
+    assert "wysie/yantrikdb-hermes-dashboard" in readme
+    assert "~/.hermes/plugins/yantrikdb-hermes-dashboard" in readme
+    assert "~/.hermes/plugin-data/yantrikdb-hermes-dashboard/settings.json" in readme
+    assert "LEGACY_SETTINGS_PATH" in Path("app.py").read_text()

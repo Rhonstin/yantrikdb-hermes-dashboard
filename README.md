@@ -11,7 +11,7 @@ It is intentionally private/local: FastAPI backend, static HTML/CSS/JS frontend,
 Install directly from GitHub with the Hermes plugin command:
 
 ```bash
-hermes plugins install wysie/yantrikdb-dashboard --enable
+hermes plugins install wysie/yantrikdb-hermes-dashboard --enable
 ```
 
 Then restart the running Hermes process so plugin metadata is rediscovered. For the gateway:
@@ -23,15 +23,15 @@ hermes gateway restart
 Manual clone is also supported if you are developing the dashboard locally:
 
 ```bash
-git clone https://github.com/wysie/yantrikdb-dashboard.git ~/.hermes/plugins/yantrikdb-dashboard
-hermes plugins enable yantrikdb-dashboard
+git clone https://github.com/wysie/yantrikdb-hermes-dashboard.git ~/.hermes/plugins/yantrikdb-hermes-dashboard
+hermes plugins enable yantrikdb-hermes-dashboard
 hermes gateway restart
 ```
 
 If the directory already exists and you intentionally want to replace it, use:
 
 ```bash
-hermes plugins install wysie/yantrikdb-dashboard --enable --force
+hermes plugins install wysie/yantrikdb-hermes-dashboard --enable --force
 hermes gateway restart
 ```
 
@@ -44,7 +44,7 @@ The plugin install gives Hermes the dashboard files. The dashboard itself is a l
 For a one-off local run:
 
 ```bash
-cd ~/.hermes/plugins/yantrikdb-dashboard
+cd ~/.hermes/plugins/yantrikdb-hermes-dashboard
 scripts/start.sh
 ```
 
@@ -74,7 +74,7 @@ scripts/start.sh
 For a dashboard that starts on login and restarts after crashes, install the LaunchAgent:
 
 ```bash
-cd ~/.hermes/plugins/yantrikdb-dashboard
+cd ~/.hermes/plugins/yantrikdb-hermes-dashboard
 YANTRIKDB_DASHBOARD_PYTHON="$HOME/.hermes/hermes-agent/venv/bin/python" \
 YANTRIKDB_DASHBOARD_HOST=127.0.0.1 \
 YANTRIKDB_DASHBOARD_PORT=8767 \
@@ -90,7 +90,7 @@ The installer writes:
 Uninstall:
 
 ```bash
-cd ~/.hermes/plugins/yantrikdb-dashboard
+cd ~/.hermes/plugins/yantrikdb-hermes-dashboard
 scripts/uninstall-launchd.sh
 ```
 
@@ -99,21 +99,21 @@ scripts/uninstall-launchd.sh
 If you installed with the Hermes plugin command:
 
 ```bash
-hermes plugins update yantrikdb-dashboard
+hermes plugins update yantrikdb-hermes-dashboard
 hermes gateway restart
 ```
 
 If you want a clean reinstall from GitHub instead of pulling into the existing directory:
 
 ```bash
-hermes plugins install wysie/yantrikdb-dashboard --enable --force
+hermes plugins install wysie/yantrikdb-hermes-dashboard --enable --force
 hermes gateway restart
 ```
 
 If you installed or develop the plugin as a manual git clone:
 
 ```bash
-cd ~/.hermes/plugins/yantrikdb-dashboard
+cd ~/.hermes/plugins/yantrikdb-hermes-dashboard
 git pull --ff-only
 hermes gateway restart
 ```
@@ -172,7 +172,7 @@ Do not expose an Admin Mode dashboard without password protection.
 | `YANTRIKDB_EMBEDDING_DIM` | inferred from DB | Override embedding dimension |
 | `YANTRIKDB_EMBEDDER` | dimension-based default | Override embedder name |
 | `YANTRIKDB_DASHBOARD_ADMIN_MODE` | `false` | Enables admin mutations at launch when truthy |
-| `YANTRIKDB_DASHBOARD_SETTINGS_PATH` | `~/.hermes/plugin-data/yantrikdb-dashboard/settings.json` | Persisted dashboard settings and password config |
+| `YANTRIKDB_DASHBOARD_SETTINGS_PATH` | `~/.hermes/plugin-data/yantrikdb-hermes-dashboard/settings.json` | Persisted dashboard settings and password config |
 | `YANTRIKDB_DASHBOARD_PYTHON` | `python3` | Python binary used by `scripts/start.sh` and `scripts/install-launchd.sh` |
 | `YANTRIKDB_DASHBOARD_LOG_DIR` | `.run` | launchd stdout/stderr directory |
 | `YANTRIKDB_DASHBOARD_LAUNCHD_LABEL` | `io.yantrikdb.dashboard.local` | macOS LaunchAgent label |
@@ -182,7 +182,7 @@ Do not expose an Admin Mode dashboard without password protection.
 The dashboard uses a local Tailwind build, not the Tailwind CDN.
 
 ```bash
-cd ~/.hermes/plugins/yantrikdb-dashboard
+cd ~/.hermes/plugins/yantrikdb-hermes-dashboard
 npm install
 npm run build:css
 ```
@@ -214,7 +214,7 @@ Do not commit memory exports, live database snapshots, or screenshots containing
 
 ## Naming
 
-The dashboard UI is named “YantrikDB for Hermes” to make the integration scope clear. The current repository/plugin slug remains `yantrikdb-dashboard` for compatibility with existing installs. If the GitHub repository is renamed later, use the new `owner/repo` slug in the Hermes plugin install command.
+The dashboard UI and repository are named “YantrikDB for Hermes” / `yantrikdb-hermes-dashboard` to make the integration scope clear. The older `yantrikdb-dashboard` GitHub URL may redirect, but new installs should use `wysie/yantrikdb-hermes-dashboard`.
 
 ## Credits
 
