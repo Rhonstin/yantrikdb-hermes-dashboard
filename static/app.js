@@ -152,7 +152,7 @@ async function init(){
   const initialMemory = new URLSearchParams(location.search).get('memory');
   if(initialView==='memories' && initialMemory) selectMemory(initialMemory,{updateUrl:false});
 }
-function updateAdminBadge(){ const on=!!(state.health?.admin_enabled||state.settings?.admin_mode); $('#adminBadge').textContent=on?'Admin Mode enabled':'Read-only'; $('#adminBadge').className=on?'pill warn':'pill neutral'; const ops=$('#opsAdminState'); if(ops){ops.textContent=on?'Admin Mode enabled':'Read-only'; ops.className=on?'pill warn':'pill neutral';} }
+function updateAdminBadge(){ const on=!!(state.health?.admin_enabled||state.settings?.admin_mode); $('#adminBadge').textContent=on?'Admin mode enabled':'Admin mode disabled'; $('#adminBadge').className=on?'pill warn':'pill neutral'; const ops=$('#opsAdminState'); if(ops){ops.textContent=on?'Admin mode enabled':'Admin mode disabled'; ops.className=on?'pill warn':'pill neutral';} }
 
 function selectedNamespaceMeta(){
   const current=ns();

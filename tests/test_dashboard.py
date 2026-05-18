@@ -519,9 +519,19 @@ def test_sidebar_credit_links_are_present():
     assert html.count('rel="noopener noreferrer"') >= 3
 
 
-def test_sidebar_credit_hidden_in_mobile_header():
+def test_sidebar_admin_status_is_compact_and_hidden_in_mobile_header():
+    html = Path("static/index.html").read_text()
     css_source = Path("src/styles.css").read_text()
-    assert ".side-card, .sidebar-credit { display: none; }" in css_source
+    js = Path("static/app.js").read_text()
+    assert 'class="admin-status" aria-label="Admin mode status"' in html
+    assert "Admin mode disabled" in html
+    assert "Toggle writes from Settings." not in html
+    assert "<div class=\"label\">Mode</div>" not in html
+    assert ".admin-status .pill" in css_source
+    assert ".side-card, .admin-status, .sidebar-credit { display: none; }" in css_source
+    assert "Admin mode enabled" in js
+    assert "Admin mode disabled" in js
+    assert "on?'Admin mode enabled':'Admin mode disabled'" in js
 
 
 def test_identity_scope_status_chips_have_layout_styles():

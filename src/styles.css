@@ -74,6 +74,8 @@
   .nav-item.active { @apply border-yan-hot/35 bg-gradient-to-r from-yan-hot/20 to-yan-orange/10 text-white shadow-glow; }
 
   .side-card { @apply rounded-2xl border border-white/10 bg-white/[.045] p-3 shadow-lg backdrop-blur-xl; }
+  .admin-status { @apply mt-1; }
+  .admin-status .pill { @apply w-fit px-3 py-1.5 text-xs normal-case tracking-normal; }
   .label { @apply mb-2 text-[10px] font-bold uppercase tracking-[.18em] text-zinc-500; }
   .mini { @apply mt-2 text-[11px] leading-4; }
   .sidebar-credit { @apply mt-auto rounded-2xl border border-white/[.07] bg-white/[.025] px-3 py-2 text-[11px] leading-5 text-zinc-500; }
@@ -417,7 +419,7 @@
   .menu-toggle { @apply flex; }
   .sidebar nav { display: none; @apply absolute left-3 right-3 top-[68px] z-[80] rounded-3xl border border-white/10 bg-[#0b0b11]/95 p-3 shadow-panel backdrop-blur-2xl; }
   body.menu-open .sidebar nav { @apply grid; }
-  .side-card, .sidebar-credit { display: none; }
+  .side-card, .admin-status, .sidebar-credit { display: none; }
   .shell { @apply ml-0 h-auto overflow-visible px-4 py-5; }
 }
 
