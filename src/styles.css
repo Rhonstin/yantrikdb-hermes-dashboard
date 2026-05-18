@@ -206,6 +206,16 @@
   .toolbar.compact { @apply mb-0; }
   .toolbar input:not([type="checkbox"]), .toolbar select { @apply min-w-[180px] flex-1; }
   .toolbar button { @apply shrink-0; }
+  .memory-toolbar { @apply items-stretch; }
+  .memory-filter-actions { @apply flex min-w-0 gap-2; }
+  .memory-filter-actions .btn { @apply min-h-10; }
+  .memory-advanced { @apply min-w-[180px] flex-[1_1_260px]; }
+  .memory-advanced summary { @apply flex min-h-10 cursor-pointer list-none items-center justify-center rounded-xl border border-white/10 bg-white/[.045] px-3 py-2 text-sm font-semibold text-zinc-200 transition hover:border-white/20 hover:bg-white/[.07]; }
+  .memory-advanced summary::-webkit-details-marker { display: none; }
+  .memory-advanced summary::after { content: '+'; @apply ml-2 text-zinc-500; }
+  .memory-advanced[open] summary::after { content: '−'; }
+  .memory-advanced-grid { @apply mt-2 grid gap-2 sm:grid-cols-3; }
+  .memory-advanced-grid input, .memory-advanced-grid select { @apply min-w-0; }
 
   .pill { @apply inline-flex items-center rounded-full border border-white/10 bg-white/[.055] px-2.5 py-1 text-[11px] font-bold text-zinc-300; }
   .pill.hot, .hot { @apply border-yan-hot/35 bg-yan-hot/15 text-yan-pink; }
@@ -404,6 +414,15 @@
   .panel, .glass, .hero-card, .recall-panel, .helper-card, .detail, .danger-zone { @apply rounded-2xl p-4; }
   .toolbar { @apply grid grid-cols-1; }
   .toolbar input:not([type="checkbox"]), .toolbar select, .toolbar button { @apply w-full min-w-0; }
+  .memory-toolbar { @apply mb-3 grid grid-cols-2 gap-2 p-2; }
+  .memory-toolbar #memoryNamespaceFilter { display: none; }
+  .memory-toolbar #memorySearch { @apply col-span-2 min-h-10; }
+  .memory-toolbar #statusFilter { @apply min-h-10; }
+  .memory-filter-actions { @apply grid grid-cols-2 gap-2; }
+  .memory-filter-actions .btn { @apply min-h-10 px-2 text-sm; }
+  .memory-advanced { @apply col-span-2 min-w-0; }
+  .memory-advanced summary { @apply min-h-9 text-xs; }
+  .memory-advanced-grid { @apply grid-cols-1; }
   .scope-bar { @apply relative grid w-full max-w-none grid-cols-1 gap-1 rounded-[22px] px-4 py-3; }
   .scope-kicker { @apply pr-24 text-[10px]; }
   .scope-bar select { @apply min-h-8 w-full max-w-none truncate rounded-lg py-0 pl-0 pr-8 text-[1rem] leading-8; appearance: none; background-image: linear-gradient(45deg, transparent 50%, rgba(161,161,170,.95) 50%), linear-gradient(135deg, rgba(161,161,170,.95) 50%, transparent 50%); background-position: calc(100% - 15px) 50%, calc(100% - 9px) 50%; background-size: 6px 6px, 6px 6px; background-repeat: no-repeat; }

@@ -48,6 +48,13 @@ function syncMemoryFiltersFromUrl(params=new URLSearchParams(location.search)){
   if(params.has('source')) $('#sourceFilter').value=params.get('source')||'';
   if(params.has('sort')) $('#sortFilter').value=params.get('sort')||'created_at';
   if(params.has('namespace')) setNamespace(params.get('namespace') || ALL_NAMESPACES);
+  updateMemoryAdvancedFilters();
+}
+function updateMemoryAdvancedFilters(){
+  const details = $('#memoryAdvancedFilters');
+  if(!details) return;
+  const hasAdvanced = !!($('#domainFilter')?.value || $('#sourceFilter')?.value || (($('#sortFilter')?.value || 'created_at') !== 'created_at'));
+  details.open = hasAdvanced;
 }
 function routeUrlFor(view){
   const url=new URL(location.href); url.searchParams.set('view',view); url.searchParams.delete('memory');
@@ -73,6 +80,7 @@ function setView(view, opts={}){
     if(opts.query.domain!==undefined) $('#domainFilter').value=opts.query.domain||'';
     if(opts.query.source!==undefined) $('#sourceFilter').value=opts.query.source||'';
     if(opts.query.sort!==undefined) $('#sortFilter').value=opts.query.sort||'created_at';
+    updateMemoryAdvancedFilters();
   }
   if(view==='memories' && opts.fromUrl) syncMemoryFiltersFromUrl();
   if(opts.updateUrl!==false) writeRoute(view,{replace:!!opts.replace});
@@ -115,7 +123,7 @@ async function init(){
   $('#scopeSelect')?.addEventListener('change',()=>{ setNamespace($('#scopeSelect').value); state.memoryOffset=0; writeRoute(state.view,{replace:true}); refreshAll(); });
   $('#memoryNamespaceFilter')?.addEventListener('change',()=>{ setNamespace($('#memoryNamespaceFilter').value); state.memoryOffset=0; writeRoute('memories',{replace:true}); refreshAll(); });
   $('#memoryApply').onclick=()=>{state.memoryOffset=0; writeRoute('memories',{replace:true}); loadMemories();};
-  $('#memoryReset')?.addEventListener('click',()=>{ $('#memorySearch').value=''; $('#statusFilter').value='active'; $('#domainFilter').value=''; $('#sourceFilter').value=''; $('#sortFilter').value='created_at'; state.memoryOffset=0; writeRoute('memories',{replace:true}); loadMemories(); });
+  $('#memoryReset')?.addEventListener('click',()=>{ $('#memorySearch').value=''; $('#statusFilter').value='active'; $('#domainFilter').value=''; $('#sourceFilter').value=''; $('#sortFilter').value='created_at'; updateMemoryAdvancedFilters(); state.memoryOffset=0; writeRoute('memories',{replace:true}); loadMemories(); });
   $('#runRecall').onclick=runRecall; $('#loadConflicts').onclick=loadConflicts;
   $('#threeRefresh')?.addEventListener('click',()=>loadVisualiser(true));
   $('#threeReset')?.addEventListener('click',()=>resetVisualiser());

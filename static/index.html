@@ -112,15 +112,22 @@
     </section>
 
     <section id="view-memories" class="view">
-      <div class="toolbar">
+      <div class="toolbar memory-toolbar">
         <select id="memoryNamespaceFilter" aria-label="Memory namespace"></select>
         <input id="memorySearch" placeholder="Search memories…" aria-label="Search memories" />
         <select id="statusFilter" aria-label="Memory status"><option value="active">Active</option><option value="consolidated">Consolidated</option><option value="tombstoned">Forgotten</option><option value="all">All statuses</option></select>
-        <input id="domainFilter" placeholder="Domain" aria-label="Domain" />
-        <input id="sourceFilter" placeholder="Source" aria-label="Source" />
-        <select id="sortFilter" aria-label="Sort memories"><option value="created_at">Newest first</option><option value="updated_at">Recently updated</option><option value="last_access">Recently accessed</option><option value="importance">Importance</option><option value="access_count">Access count</option></select>
-        <button id="memoryApply" class="btn secondary">Apply filters</button>
-        <button id="memoryReset" class="btn secondary">Reset</button>
+        <div class="memory-filter-actions">
+          <button id="memoryApply" class="btn secondary">Apply</button>
+          <button id="memoryReset" class="btn ghost">Reset</button>
+        </div>
+        <details id="memoryAdvancedFilters" class="memory-advanced">
+          <summary>More filters</summary>
+          <div class="memory-advanced-grid">
+            <input id="domainFilter" placeholder="Domain" aria-label="Domain" />
+            <input id="sourceFilter" placeholder="Source" aria-label="Source" />
+            <select id="sortFilter" aria-label="Sort memories"><option value="created_at">Newest first</option><option value="updated_at">Recently updated</option><option value="last_access">Recently accessed</option><option value="importance">Importance</option><option value="access_count">Access count</option></select>
+          </div>
+        </details>
       </div>
       <div class="split memories-split">
         <div class="panel list-panel"><div id="memoryList" class="memory-list"></div><div id="memoryPager" class="pager"></div></div>

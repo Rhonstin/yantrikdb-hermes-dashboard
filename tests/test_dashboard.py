@@ -636,6 +636,22 @@ def test_identity_namespace_coverage_does_not_use_table_wrapper_border():
     assert ".coverage-wrap { @apply max-w-full overflow-visible rounded-none border-0 bg-transparent; }" in css
 
 
+def test_mobile_memory_browser_filters_are_compact():
+    html = Path("static/index.html").read_text()
+    css = Path("src/styles.css").read_text()
+    js = Path("static/app.js").read_text()
+    assert 'class="toolbar memory-toolbar"' in html
+    assert 'id="memoryAdvancedFilters" class="memory-advanced"' in html
+    assert "More filters" in html
+    assert '<button id="memoryApply" class="btn secondary">Apply</button>' in html
+    assert '<button id="memoryReset" class="btn ghost">Reset</button>' in html
+    assert ".memory-toolbar #memoryNamespaceFilter { display: none; }" in css
+    assert ".memory-toolbar #memorySearch { @apply col-span-2 min-h-10; }" in css
+    assert ".memory-filter-actions { @apply grid grid-cols-2 gap-2; }" in css
+    assert "function updateMemoryAdvancedFilters()" in js
+    assert "details.open = hasAdvanced" in js
+
+
 def test_readme_documents_mock_screenshot_gallery():
     readme = Path("README.md").read_text()
     assert "## Screenshots" in readme
