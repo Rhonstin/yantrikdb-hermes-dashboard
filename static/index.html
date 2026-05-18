@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>YantrikDB Dashboard</title>
   <link rel="icon" href="/static/assets/favicon.svg?v=yantrikdb-white-favicon-2" type="image/svg+xml">
-  <link rel="stylesheet" href="/static/styles.css?v=impeccable-polish-30" />
+  <link rel="stylesheet" href="/static/styles.css?v=impeccable-polish-31" />
 </head>
 <body>
   <div class="grain"></div>
@@ -27,9 +27,9 @@
       <button class="nav-item" data-view="recall">Recall</button>
       <button class="nav-item" data-view="conflicts">Contradictions</button>
       <button class="nav-item" data-view="graph">Entity Graph</button>
-      <button class="nav-item" data-view="identity-scope">Identity &amp; Scope</button>
       <button class="nav-item" data-view="lifecycle">Lifecycle</button>
       <button class="nav-item" data-view="ops">Maintenance</button>
+      <button class="nav-item" data-view="identity-scope">Identity &amp; Scope</button>
       <button class="nav-item" data-view="settings">Settings</button>
     </nav>
     <div class="side-card">
@@ -169,12 +169,60 @@
     </section>
 
 
+    <section id="view-lifecycle" class="view">
+      <div class="grid stats" id="lifecycleCards"></div>
+      <div class="two-col">
+      <div class="panel"><div class="panel-head"><h2>Stale memories</h2><span class="muted">Candidates for review</span></div><div id="staleList" class="memory-list"></div></div>
+      <div class="panel"><div class="panel-head"><h2>Upcoming reminders</h2><span class="muted">Time-based memories</span></div><div id="upcomingList" class="memory-list"></div></div>
+      </div>
+      <div class="two-col">
+        <div class="panel"><div class="panel-head"><h2>Patterns</h2><span class="muted">Repeated themes</span></div><div id="patternList" class="memory-list"></div></div>
+        <div class="panel"><div class="panel-head"><h2>Triggers</h2><span class="muted">Proactive signals</span></div><div id="triggerList" class="memory-list"></div></div>
+      </div>
+    </section>
+
+    <section id="view-ops" class="view">
+      <div class="maintenance-layout">
+        <div class="panel maintenance-panel">
+          <div class="panel-head"><h2>Maintenance</h2><span id="opsAdminState" class="pill neutral">Read-only</span></div>
+          <p class="page-copy">Run safe housekeeping for the selected memory scope. Keep Admin Mode off unless you are intentionally changing memory metadata.</p>
+          <div class="maintenance-scope">
+            <span>Runs on</span>
+            <strong id="opsScopeName">Current scope</strong>
+            <em id="opsScopeCount"></em>
+          </div>
+          <div class="action-list">
+            <div class="action-row">
+              <div>
+                <strong>Maintenance pass</strong>
+                <span>Consolidates duplicates, scans contradictions, and updates memory metadata.</span>
+              </div>
+              <button id="runThink" class="btn primary">Run pass</button>
+            </div>
+            <div class="action-row secondary-row">
+              <div>
+                <strong>Health check</strong>
+                <span>Refresh dashboard configuration, database path, plugin state, and namespace counts.</span>
+              </div>
+              <button id="refreshHealth" class="btn secondary">Refresh</button>
+            </div>
+          </div>
+          <details id="opsDetails" class="details-block">
+            <summary>Show maintenance output</summary>
+            <pre id="opsOutput"></pre>
+          </details>
+        </div>
+        <div class="panel advanced-panel"><div class="panel-head"><h2>System health</h2><span class="muted">Advanced details</span></div><pre id="healthPayload"></pre></div>
+      </div>
+    </section>
+
     <section id="view-identity-scope" class="view">
       <div class="identity-hero panel">
         <div>
           <div class="label">Memory governance</div>
           <h2>Identity &amp; Scope</h2>
           <p class="page-copy">Create identities to group platform accounts under the right person. Use shared spaces for group chats or household/team memory.</p>
+          <div id="identityScopingStatus" class="scope-status-row" aria-label="Memory scoping status"></div>
         </div>
         <div id="identityScopeSummary" class="identity-summary" aria-label="Identity and scope summary"></div>
       </div>
@@ -245,53 +293,6 @@
             <button id="saveIdentityScope" class="btn primary" type="button">Save registry</button>
           </div>
         </details>
-      </div>
-    </section>
-
-    <section id="view-lifecycle" class="view">
-      <div class="grid stats" id="lifecycleCards"></div>
-      <div class="two-col">
-      <div class="panel"><div class="panel-head"><h2>Stale memories</h2><span class="muted">Candidates for review</span></div><div id="staleList" class="memory-list"></div></div>
-      <div class="panel"><div class="panel-head"><h2>Upcoming reminders</h2><span class="muted">Time-based memories</span></div><div id="upcomingList" class="memory-list"></div></div>
-      </div>
-      <div class="two-col">
-        <div class="panel"><div class="panel-head"><h2>Patterns</h2><span class="muted">Repeated themes</span></div><div id="patternList" class="memory-list"></div></div>
-        <div class="panel"><div class="panel-head"><h2>Triggers</h2><span class="muted">Proactive signals</span></div><div id="triggerList" class="memory-list"></div></div>
-      </div>
-    </section>
-
-    <section id="view-ops" class="view">
-      <div class="maintenance-layout">
-        <div class="panel maintenance-panel">
-          <div class="panel-head"><h2>Maintenance</h2><span id="opsAdminState" class="pill neutral">Read-only</span></div>
-          <p class="page-copy">Run safe housekeeping for the selected memory scope. Keep Admin Mode off unless you are intentionally changing memory metadata.</p>
-          <div class="maintenance-scope">
-            <span>Runs on</span>
-            <strong id="opsScopeName">Current scope</strong>
-            <em id="opsScopeCount"></em>
-          </div>
-          <div class="action-list">
-            <div class="action-row">
-              <div>
-                <strong>Maintenance pass</strong>
-                <span>Consolidates duplicates, scans contradictions, and updates memory metadata.</span>
-              </div>
-              <button id="runThink" class="btn primary">Run pass</button>
-            </div>
-            <div class="action-row secondary-row">
-              <div>
-                <strong>Health check</strong>
-                <span>Refresh dashboard configuration, database path, plugin state, and namespace counts.</span>
-              </div>
-              <button id="refreshHealth" class="btn secondary">Refresh</button>
-            </div>
-          </div>
-          <details id="opsDetails" class="details-block">
-            <summary>Show maintenance output</summary>
-            <pre id="opsOutput"></pre>
-          </details>
-        </div>
-        <div class="panel advanced-panel"><div class="panel-head"><h2>System health</h2><span class="muted">Advanced details</span></div><pre id="healthPayload"></pre></div>
       </div>
     </section>
 
@@ -376,6 +377,6 @@
       <div class="modal-actions"><button id="confirmCancel" class="btn secondary">Cancel</button><button id="confirmOk" class="btn primary">Continue</button></div>
     </div>
   </div>
-  <script src="/static/app.js?v=impeccable-polish-30"></script>
+  <script src="/static/app.js?v=impeccable-polish-31"></script>
 </body>
 </html>

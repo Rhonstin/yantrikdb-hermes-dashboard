@@ -367,6 +367,9 @@ def actor_from_owner_namespace(namespace: str) -> str:
     match = re.match(r"whatsapp-(\d+)-lid-[0-9a-f]{12}$", tail)
     if match:
         return f"whatsapp:{match.group(1)}@lid"
+    match = re.match(r"whatsapp-(\d+)-[0-9a-f]{12}$", tail)
+    if match:
+        return f"whatsapp:{match.group(1)}"
     match = re.match(r"telegram-(.+)-[0-9a-f]{12}$", tail)
     if match:
         return f"telegram:{match.group(1)}"
@@ -468,6 +471,7 @@ def identity_scope_payload() -> dict[str, Any]:
     stored = normalise_identity_scope_config(settings.get("identity_scope"))
     imported = load_yantrikdb_identity_scope_config()
     config = merge_identity_scope_config(stored, imported)
+    runtime_scope = yantrikdb_settings_payload()
     namespace_rows = rows("SELECT namespace, COUNT(*) count FROM memories GROUP BY namespace ORDER BY namespace") if table_exists("memories") else []
     existing_actor_keys = {f"{a.get('platform')}:{a.get('actor_id')}" for a in config["actors"]}
     for row in namespace_rows:
@@ -498,6 +502,12 @@ def identity_scope_payload() -> dict[str, Any]:
         scope_details.setdefault(str(scope), {"label": label, "kind": kind, "source": source})
 
     identity_labels = {str(i.get("id")): str(i.get("label") or i.get("id")) for i in config["identities"] if i.get("id")}
+    actor_identity_lookup: dict[str, str] = {}
+    for actor in config["actors"]:
+        raw_actor = f"{actor.get('platform')}:{actor.get('actor_id')}" if actor.get('platform') and actor.get('actor_id') else ""
+        identity = str(actor.get("identity") or "")
+        if raw_actor and identity:
+            actor_identity_lookup[raw_actor] = identity
     for ident in config["identities"]:
         label = str(ident.get("label") or ident.get("id") or "Identity")
         if ident.get("private_scope"):
@@ -522,10 +532,49 @@ def identity_scope_payload() -> dict[str, Any]:
         if convo.get("scope"):
             remember_scope(str(convo["scope"]), str(convo.get("label") or convo.get("conversation_id") or convo["scope"]), "conversation_route", str(convo.get("source") or "configured"))
     inventory = []
+    base_namespace = str(runtime_scope.get("default_namespace") or DEFAULT_NAMESPACE)
     for row in namespace_rows:
         namespace = str(row["namespace"])
         matched_scope = next((scope for scope in scope_details if namespace_matches_scope(namespace, scope)), "")
         detail = scope_details.get(matched_scope, {}) if matched_scope else {}
+        derived_by_config = False
+        raw_legacy_actor = actor_from_owner_namespace(namespace)
+        if (
+            matched_scope
+            and runtime_scope.get("owner_scoping")
+            and runtime_scope.get("include_legacy_actor_namespace_recall")
+            and raw_legacy_actor
+            and actor_identity_lookup.get(raw_legacy_actor)
+            and detail.get("kind") == "actor"
+        ):
+            identity = actor_identity_lookup[raw_legacy_actor]
+            ident_label = identity_labels.get(identity, identity)
+            detail = {
+                "label": f"{ident_label} via old account bucket",
+                "kind": "legacy_actor_fallback",
+                "source": "include_legacy_actor_namespace_recall",
+            }
+            derived_by_config = True
+        if not matched_scope and runtime_scope.get("owner_scoping") and runtime_scope.get("include_base_namespace_recall") and namespace == base_namespace:
+            matched_scope = namespace
+            detail = {
+                "label": "Shared by all profiles",
+                "kind": "shared_fallback",
+                "source": "include_base_namespace_recall",
+            }
+            derived_by_config = True
+        if not matched_scope and runtime_scope.get("owner_scoping") and runtime_scope.get("include_legacy_actor_namespace_recall"):
+            raw_actor = raw_legacy_actor
+            identity = actor_identity_lookup.get(raw_actor, "")
+            if raw_actor and identity:
+                ident_label = identity_labels.get(identity, identity)
+                matched_scope = namespace
+                detail = {
+                    "label": f"{ident_label} via old account bucket",
+                    "kind": "legacy_actor_fallback",
+                    "source": "include_legacy_actor_namespace_recall",
+                }
+                derived_by_config = True
         inventory.append({
             "namespace": namespace,
             "count": int(row["count"] or 0),
@@ -534,6 +583,7 @@ def identity_scope_payload() -> dict[str, Any]:
             "mapped_to": detail.get("label", ""),
             "mapping_type": detail.get("kind", ""),
             "mapping_source": detail.get("source", ""),
+            "derived_by_config": derived_by_config,
         })
     summary = {
         "identities": len(config["identities"]),
@@ -542,7 +592,7 @@ def identity_scope_payload() -> dict[str, Any]:
         "conversations": len(config["conversations"]),
         "unmapped_namespaces": sum(1 for item in inventory if not item["mapped"]),
     }
-    return {"identity_scope": config, "namespace_inventory": inventory, "summary": summary, "imported_identity_scope": imported}
+    return {"identity_scope": config, "namespace_inventory": inventory, "summary": summary, "imported_identity_scope": imported, "runtime_scope": runtime_scope}
 
 
 @app.get("/api/identity-scope")

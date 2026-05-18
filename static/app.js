@@ -410,14 +410,25 @@ async function addConversationFromForm(e){
 
 function renderIdentityScope(data){
   state.identityScope=data;
-  const cfg=data.identity_scope||{}; const summary=data.summary||{};
-  $('#identityScopeSummary').innerHTML=[['People',summary.identities],['Actors',summary.actors],['Shared spaces',summary.spaces],['Chat routes',summary.conversations],['Unmapped',summary.unmapped_namespaces]].map(([k,v])=>`<div class="metric"><div class="metric-label">${esc(k)}</div><div class="metric-value">${esc(fmt(v||0))}</div></div>`).join('');
+  const cfg=data.identity_scope||{}; const summary=data.summary||{}; const runtime=data.runtime_scope||{};
+  $('#identityScopeSummary').innerHTML=[['People',summary.identities],['Actors',summary.actors],['Shared spaces',summary.spaces],['Chat routes',summary.conversations],['Needs review',summary.unmapped_namespaces]].map(([k,v])=>`<div class="metric"><div class="metric-label">${esc(k)}</div><div class="metric-value">${esc(fmt(v||0))}</div></div>`).join('');
+  $('#identityScopingStatus').innerHTML=[
+    ['Person scoping', runtime.owner_scoping, 'owner_scoping'],
+    ['Shared fallback', runtime.include_base_namespace_recall, 'include_base_namespace_recall'],
+    ['Old actor recall', runtime.include_legacy_actor_namespace_recall, 'include_legacy_actor_namespace_recall'],
+  ].map(([label,on,key])=>`<span class="scope-status ${on?'on':'off'}"><strong>${esc(label)}: ${on?'On':'Off'}</strong><code>${esc(key)}</code></span>`).join('');
   $('#identityList').innerHTML=renderScopeRows(cfg.identities,'identities');
   renderActorIdentityFilter(cfg);
   $('#actorList').innerHTML=renderScopeRows(filteredActors(cfg),'actors');
   $('#spaceList').innerHTML=renderScopeRows(cfg.spaces,'spaces');
   $('#conversationList').innerHTML=renderScopeRows(cfg.conversations,'conversations');
-  $('#identityNamespaceTable').innerHTML=`<table><thead><tr><th>Namespace</th><th>Rows</th><th>Belongs to</th><th>Status</th></tr></thead><tbody>${(data.namespace_inventory||[]).map(n=>`<tr><td><code>${esc(n.namespace)}</code></td><td>${fmt(n.count)}</td><td>${n.mapped?`<div class="mapped-owner"><strong>${esc(n.mapped_to || 'Mapped')}</strong><span>${esc((n.mapping_type || '').replace('_',' '))}</span></div>`:'<span class="muted">No person or space yet</span>'}</td><td><span class="pill ${n.mapped?'neutral':'warn'}">${n.mapped?'Mapped':'Needs review'}</span></td></tr>`).join('') || '<tr><td colspan="4">No namespaces found.</td></tr>'}</tbody></table>`;
+  $('#identityNamespaceTable').innerHTML=`<table><thead><tr><th>Namespace</th><th>Rows</th><th>Belongs to</th><th>Status</th></tr></thead><tbody>${(data.namespace_inventory||[]).map(n=>{
+    const type=(n.mapping_type || '').replaceAll('_',' ');
+    const source=n.mapping_source ? ` · ${n.mapping_source}` : '';
+    const belongs=n.mapped?`<div class="mapped-owner"><strong>${esc(n.mapped_to || 'Mapped')}</strong><span>${esc(type + source)}</span></div>`:'<span class="muted">No person, shared space, or enabled fallback yet</span>';
+    const status=n.mapped?(n.derived_by_config?'Covered by settings':'Mapped'):'Needs review';
+    return `<tr><td><code>${esc(n.namespace)}</code></td><td>${fmt(n.count)}</td><td>${belongs}</td><td><span class="pill ${n.mapped?'neutral':'warn'}">${esc(status)}</span></td></tr>`;
+  }).join('') || '<tr><td colspan="4">No namespaces found.</td></tr>'}</tbody></table>`;
   $('#identityScopeJson').value=compactJson(cfg);
   renderIdentityScopeSelectors(cfg);
   bindIdentityScopeRowActions();

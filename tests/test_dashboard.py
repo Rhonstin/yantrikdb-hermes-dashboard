@@ -291,6 +291,48 @@ def test_identity_scope_api_returns_config_and_unmapped_namespaces(tmp_path, mon
     assert data["namespace_inventory"][1]["mapping_type"] == "shared_scope"
 
 
+def test_identity_scope_marks_config_covered_namespaces(tmp_path, monkeypatch):
+    import sqlite3
+
+    db_path = tmp_path / "yantrikdb.db"
+    with sqlite3.connect(db_path) as conn:
+        conn.execute("CREATE TABLE memories (namespace TEXT)")
+        conn.executemany("INSERT INTO memories(namespace) VALUES (?)", [
+            ("hermes:hermes:default",),
+            ("hermes:hermes:default:owner:whatsapp-6590264641-d4754bd8c823",),
+        ])
+
+    identity_map_path = tmp_path / "identity-map.json"
+    identity_map_path.write_text(json.dumps({
+        "owners": {
+            "owner:yc": {"actors": ["whatsapp:6590264641"]}
+        }
+    }))
+    config_path = tmp_path / "yantrikdb.json"
+    config_path.write_text(json.dumps({
+        "mode": "embedded",
+        "namespace": "hermes",
+        "top_k": "10",
+        "owner_scoping": True,
+        "include_base_namespace_recall": True,
+        "include_legacy_actor_namespace_recall": True,
+        "identity_map_path": str(identity_map_path),
+    }))
+    monkeypatch.setattr(dashboard, "DB_PATH", db_path)
+    monkeypatch.setattr(dashboard, "YANTRIKDB_CONFIG_PATH", config_path)
+    monkeypatch.setattr(dashboard, "SETTINGS_PATH", tmp_path / "settings.json")
+
+    payload = dashboard.identity_scope_payload()
+    by_ns = {item["namespace"]: item for item in payload["namespace_inventory"]}
+    assert by_ns["hermes:hermes:default"]["mapped_to"] == "Shared by all profiles"
+    assert by_ns["hermes:hermes:default"]["mapping_type"] == "shared_fallback"
+    assert by_ns["hermes:hermes:default"]["derived_by_config"] is True
+    legacy = by_ns["hermes:hermes:default:owner:whatsapp-6590264641-d4754bd8c823"]
+    assert legacy["mapped_to"] == "Yc via old account bucket"
+    assert legacy["mapping_type"] == "legacy_actor_fallback"
+    assert payload["runtime_scope"]["owner_scoping"] is True
+
+
 def test_identity_scope_api_persists_config_when_admin_enabled(tmp_path, monkeypatch):
     monkeypatch.setattr(dashboard, "SETTINGS_PATH", tmp_path / "settings.json")
     monkeypatch.setattr(dashboard, "YANTRIKDB_CONFIG_PATH", tmp_path / "missing-yantrikdb.json")
@@ -315,8 +357,10 @@ def test_index_has_identity_scope_page_contract():
     html = (Path(dashboard.STATIC_DIR) / "index.html").read_text()
     js = (Path(dashboard.STATIC_DIR) / "app.js").read_text()
     assert 'data-view="identity-scope">Identity &amp; Scope</button>' in html
+    assert 'data-view="ops">Maintenance</button>\n      <button class="nav-item" data-view="identity-scope"' in html
     assert 'id="view-identity-scope"' in html
     assert 'id="identityScopeSummary"' in html
+    assert 'id="identityScopingStatus"' in html
     assert 'id="ownerScopingToggle"' in html
     assert 'id="includeBaseRecallToggle"' in html
     assert 'id="includeActorRecallToggle"' in html
