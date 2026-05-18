@@ -350,6 +350,8 @@
   .three-aura-layer { @apply pointer-events-none absolute inset-0; }
   .three-aura-oval { @apply absolute h-28 w-56 rounded-[999px] border border-yan-hot/10 bg-yan-hot/[.035] blur-[1px]; }
   .fullscreen-exit { display: none; }
+  .viewport-fullscreen { @apply absolute right-4 top-4 z-30 grid h-10 w-10 place-items-center rounded-xl border border-white/10 bg-black/45 text-lg font-semibold leading-none text-zinc-200 shadow-panel backdrop-blur-xl transition hover:-translate-y-0.5 hover:border-white/25 hover:bg-white/10 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-yan-hot/45; }
+  .three-viewport:fullscreen .viewport-fullscreen { display: none; }
   .three-viewport:fullscreen .fullscreen-exit { @apply absolute right-4 top-4 z-30 inline-flex; }
   .three-fullscreen-inspector { @apply pointer-events-auto absolute bottom-4 right-4 z-30 hidden w-[min(420px,calc(100%-2rem))] rounded-3xl border border-white/10 bg-[#080911]/85 p-4 text-sm shadow-panel backdrop-blur-2xl; }
   .three-viewport:fullscreen .three-fullscreen-inspector.active,
@@ -408,7 +410,7 @@
   .scope-count { @apply absolute right-4 top-3 px-2 py-0.5 text-[10px]; }
   .scope-loading { @apply w-fit; }
   .visualiser-toolbar { @apply flex flex-col gap-3 p-3; }
-  .visualiser-actions { @apply grid w-full grid-cols-3 gap-2; }
+  .visualiser-actions { @apply grid w-full grid-cols-4 gap-2; }
   .visualiser-toolbar .visualiser-actions .btn { @apply w-full rounded-full px-2 py-1.5 text-sm; min-height: 36px; }
   .visualiser-toolbar .muted { @apply whitespace-normal text-xs leading-5; }
   .three-viewport:fullscreen .three-fullscreen-inspector,

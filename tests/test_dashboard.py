@@ -589,7 +589,7 @@ def test_three_visualiser_fullscreen_overlay_is_inside_viewport():
     assert "threeOverlayMemory" in js
     assert "threeOverlaySearch" in js
     assert "threeOverlayClose" in js
-    assert "three-fullscreen-inspector,.fullscreen-exit,.constellation-legend" in js
+    assert "three-fullscreen-inspector,.fullscreen-exit,.viewport-fullscreen,.constellation-legend" in js
 
 
 def test_mobile_scope_and_visualiser_toolbar_css_is_compact():
@@ -597,14 +597,22 @@ def test_mobile_scope_and_visualiser_toolbar_css_is_compact():
     assert ".scope-bar select" in css
     assert "appearance: none" in css
     assert "background-position: calc(100% - 15px) 50%" in css
-    assert ".visualiser-actions { @apply grid w-full grid-cols-3 gap-2; }" in css
+    assert ".visualiser-actions { @apply grid w-full grid-cols-4 gap-2; }" in css
     assert ".visualiser-toolbar .visualiser-actions .btn" in css
     assert "whitespace-normal text-xs leading-5" in css
 
 
-def test_visualiser_fullscreen_mobile_label_is_short():
+def test_visualiser_fullscreen_control_lives_in_viewport():
     html = Path("static/index.html").read_text()
-    assert 'id="threeFullscreen" class="btn secondary" aria-label="Fullscreen">Full</button>' in html
+    css = Path("src/styles.css").read_text()
+    js = Path("static/app.js").read_text()
+    assert 'id="threeFullscreen" class="viewport-fullscreen" aria-label="Open visualiser fullscreen"' in html
+    assert html.index('id="threeFullscreen"') > html.index('id="threeViewport"')
+    assert html.index('id="threeFullscreen"') < html.index('id="threeLabels"')
+    assert 'id="threeFullscreen" class="btn secondary"' not in html
+    assert ".viewport-fullscreen" in css
+    assert ".three-viewport:fullscreen .viewport-fullscreen { display: none; }" in css
+    assert ".viewport-fullscreen" in js
     assert "Drag to rotate · Pinch to zoom · Pan to move." in html
 
 

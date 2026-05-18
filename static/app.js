@@ -1408,7 +1408,7 @@ function bindThreeControls(){
     else { threeVis.drag=null; viewport.style.cursor='grab'; }
   };
   viewport.addEventListener('pointerup', end); viewport.addEventListener('pointercancel', end); viewport.addEventListener('pointerleave', end);
-  viewport.addEventListener('click', e=>{ if(e.target.closest('.three-fullscreen-inspector,.fullscreen-exit,.constellation-legend')) return; if(viewport.dataset.suppressClick==='true'){ viewport.dataset.suppressClick='false'; return; } pickThreeNode(e); });
+  viewport.addEventListener('click', e=>{ if(e.target.closest('.three-fullscreen-inspector,.fullscreen-exit,.viewport-fullscreen,.constellation-legend')) return; if(viewport.dataset.suppressClick==='true'){ viewport.dataset.suppressClick='false'; return; } pickThreeNode(e); });
 }
 function pickThreeNode(e){
   if(!threeVis.camera || !threeVis.group) return;
