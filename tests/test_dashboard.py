@@ -303,6 +303,7 @@ def test_index_has_identity_scope_page_contract():
     assert "Identity" in js
     assert "Unassigned" in js
     assert "memory bucket discovery" in js
+    assert "checkbox-pill-row" in js
     assert "renderSpaceMemberChecklist" in js
     assert "selectedSpaceMembers" in js
     assert "availablePlatformOptions" in js
