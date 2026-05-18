@@ -210,8 +210,8 @@ function renderScopeRows(items, kind){
     const copy={
       identities:['No people yet.','Detected actors can be assigned once a person exists.'],
       actors:['No actors detected yet.','When WhatsApp, Telegram, or other platforms appear in identity config, they show here automatically.'],
-      spaces:['No shared spaces yet.','Create spaces for household, team, or group-chat memory.'],
-      conversations:['No conversation routes.','Route group chats to shared spaces when needed.'],
+      spaces:['No shared spaces yet.','Create one for household, team, or group-chat memory.'],
+      conversations:['No chat routes yet.','Choose which shared space each group chat should use.'],
     }[kind] || ['Nothing configured.','Add rows below.'];
     return scopeEmpty(copy[0], copy[1]);
   }
@@ -232,12 +232,12 @@ function renderScopeRows(items, kind){
       return `<div class="scope-card actor-row"><div class="actor-main"><strong>${esc(title)}</strong><div class="scope-chip-row">${pieces.join('')}</div>${detail}</div>${actions}</div>`;
     }
     if(kind==='spaces'){
-      pieces.push(chip('Space', item.id), chip('Members', Array.isArray(item.members)?item.members.join(', '):(item.members||'')));
+      pieces.push(chip('Shared space', item.id), chip('Members', Array.isArray(item.members)?item.members.join(', '):(item.members||'')));
       detail = `<details class="scope-technical"><summary>Technical scope</summary><code>${esc(item.scope || '')}</code></details>`;
       actions = `<button class="btn tiny secondary" type="button" data-edit-space="${esc(item.id||'')}">Edit space</button>`;
     }
     if(kind==='conversations'){
-      pieces.push(chip('Platform', item.platform), chip('Conversation', item.conversation_id), chip('Routes to', item.scope));
+      pieces.push(chip('Platform', item.platform), chip('Chat', item.conversation_id), chip('Shared space', item.scope));
       actions = `<button class="btn tiny secondary" type="button" data-edit-conversation="${esc((item.platform||'')+':'+(item.conversation_id||''))}">Edit route</button>`;
     }
     return `<div class="scope-card"><div class="scope-card-head"><strong>${esc(title)}</strong>${actions}</div><div class="scope-chip-row">${pieces.join('')}</div>${detail}</div>`;
@@ -364,11 +364,11 @@ async function addActorFromForm(e){
 async function addSpaceFromForm(e){
   e.preventDefault();
   const id=cleanId($('#spaceId')?.value);
-  if(!id){ toast('Enter a shared scope ID first'); return; }
+  if(!id){ toast('Enter a shared space ID first'); return; }
   const cfg=identityConfig();
   const scope=cleanId($('#spaceScope')?.value) || `space:${id}`;
   upsertBy(cfg.spaces,{id,label:cleanId($('#spaceLabel')?.value)||id,scope,members:csvList($('#spaceMembers')?.value)}, item=>item.id);
-  try{ await persistIdentityConfig(cfg, 'Shared scope added'); e.target.reset(); }catch(err){ toast(err.message || 'Could not add shared scope'); }
+  try{ await persistIdentityConfig(cfg, 'Shared space added'); e.target.reset(); }catch(err){ toast(err.message || 'Could not add shared space'); }
 }
 async function addConversationFromForm(e){
   e.preventDefault();
@@ -376,13 +376,13 @@ async function addConversationFromForm(e){
   if(!platform || !conversation_id || !scope){ toast('Enter platform, conversation ID, and scope'); return; }
   const cfg=identityConfig();
   upsertBy(cfg.conversations,{platform,conversation_id,scope}, item=>`${item.platform}:${item.conversation_id}`);
-  try{ await persistIdentityConfig(cfg, 'Conversation route saved'); e.target.reset(); renderIdentityScopeSelectors(cfg); }catch(err){ toast(err.message || 'Could not route conversation'); }
+  try{ await persistIdentityConfig(cfg, 'Chat route saved'); e.target.reset(); renderIdentityScopeSelectors(cfg); }catch(err){ toast(err.message || 'Could not route chat'); }
 }
 
 function renderIdentityScope(data){
   state.identityScope=data;
   const cfg=data.identity_scope||{}; const summary=data.summary||{};
-  $('#identityScopeSummary').innerHTML=[['Identities',summary.identities],['Actors',summary.actors],['Shared scopes',summary.spaces],['Routes',summary.conversations],['Unmapped',summary.unmapped_namespaces]].map(([k,v])=>`<div class="metric"><div class="metric-label">${esc(k)}</div><div class="metric-value">${esc(fmt(v||0))}</div></div>`).join('');
+  $('#identityScopeSummary').innerHTML=[['People',summary.identities],['Actors',summary.actors],['Shared spaces',summary.spaces],['Chat routes',summary.conversations],['Unmapped',summary.unmapped_namespaces]].map(([k,v])=>`<div class="metric"><div class="metric-label">${esc(k)}</div><div class="metric-value">${esc(fmt(v||0))}</div></div>`).join('');
   $('#identityList').innerHTML=renderScopeRows(cfg.identities,'identities');
   renderActorIdentityFilter(cfg);
   $('#actorList').innerHTML=renderScopeRows(filteredActors(cfg),'actors');

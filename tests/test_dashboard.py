@@ -286,6 +286,9 @@ def test_index_has_identity_scope_page_contract():
     assert 'id="spaceForm"' in html
     assert 'id="conversationForm"' in html
     assert '<h2>Actors</h2><span class="muted">platform accounts</span>' in html
+    assert "Create identities to group platform accounts" in html
+    assert "Shared spaces" in html
+    assert "Chat routing" in html
     assert "who each memory bucket belongs to" in html
     assert "Edit person" in js
     assert "Technical details" in js
@@ -297,6 +300,8 @@ def test_index_has_identity_scope_page_contract():
     assert "Identity" in js
     assert "Unassigned" in js
     assert "memory bucket discovery" in js
+    assert "Chat route saved" in js
+    assert "Shared space added" in js
     assert "identity-scope" in js
     assert "/api/identity-scope" in js
     assert "addIdentityFromForm" in js

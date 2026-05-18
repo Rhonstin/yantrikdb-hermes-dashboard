@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>YantrikDB Dashboard</title>
   <link rel="icon" href="/static/assets/favicon.svg?v=yantrikdb-white-favicon-2" type="image/svg+xml">
-  <link rel="stylesheet" href="/static/styles.css?v=impeccable-polish-15" />
+  <link rel="stylesheet" href="/static/styles.css?v=impeccable-polish-16" />
 </head>
 <body>
   <div class="grain"></div>
@@ -174,13 +174,13 @@
         <div>
           <div class="label">Memory governance</div>
           <h2>Identity &amp; Scope</h2>
-          <p class="page-copy">Detected WhatsApp, Telegram, and other platform actors are grouped into people and shared memory spaces. Edit labels and routes here; technical owner IDs stay tucked away.</p>
+          <p class="page-copy">Create identities to group platform accounts under the right person. Use shared spaces for group chats or household/team memory.</p>
         </div>
         <div id="identityScopeSummary" class="identity-summary" aria-label="Identity and scope summary"></div>
       </div>
       <div class="scope-grid">
         <div class="panel scope-panel">
-          <div class="panel-head"><h2>People</h2><span class="muted">friendly memory owners</span></div>
+          <div class="panel-head"><h2>People</h2><span class="muted">who the accounts belong to</span></div>
           <form id="identityForm" class="scope-form" aria-label="Add identity">
             <input id="identityId" placeholder="Short ID, e.g. yc" autocomplete="off" />
             <input id="identityLabel" placeholder="Display name, e.g. Yuan Chin" autocomplete="off" />
@@ -208,23 +208,23 @@
           </details>
         </div>
         <div class="panel scope-panel">
-          <div class="panel-head"><h2>Shared scopes</h2><span class="muted">groups and spaces</span></div>
-          <form id="spaceForm" class="scope-form" aria-label="Add shared scope">
-            <input id="spaceId" placeholder="Scope ID, e.g. household" autocomplete="off" />
+          <div class="panel-head"><h2>Shared spaces</h2><span class="muted">group memory</span></div>
+          <form id="spaceForm" class="scope-form" aria-label="Add shared space">
+            <input id="spaceId" placeholder="Space ID, e.g. household" autocomplete="off" />
             <input id="spaceLabel" placeholder="Label, e.g. Household" autocomplete="off" />
-            <input id="spaceScope" placeholder="Memory scope, e.g. space:household" autocomplete="off" />
+            <input id="spaceScope" placeholder="Advanced storage ID, auto-filled if blank" autocomplete="off" />
             <input id="spaceMembers" placeholder="Members, comma separated" autocomplete="off" />
-            <button class="btn secondary" type="submit">Add shared scope</button>
+            <button class="btn secondary" type="submit">Add shared space</button>
           </form>
           <div id="spaceList" class="scope-list"></div>
         </div>
         <div class="panel scope-panel">
-          <div class="panel-head"><h2>Conversation routing</h2><span class="muted">chat → memory scope</span></div>
-          <form id="conversationForm" class="scope-form" aria-label="Route conversation">
+          <div class="panel-head"><h2>Chat routing</h2><span class="muted">which chats use shared memory</span></div>
+          <form id="conversationForm" class="scope-form" aria-label="Route chat">
             <input id="conversationPlatform" placeholder="Platform, e.g. whatsapp" autocomplete="off" />
-            <input id="conversationId" placeholder="Conversation/chat ID" autocomplete="off" />
-            <select id="conversationScope" aria-label="Conversation memory scope"></select>
-            <button class="btn secondary" type="submit">Route conversation</button>
+            <input id="conversationId" placeholder="Chat ID" autocomplete="off" />
+            <select id="conversationScope" aria-label="Chat shared space"></select>
+            <button class="btn secondary" type="submit">Save chat route</button>
           </form>
           <div id="conversationList" class="scope-list"></div>
         </div>
@@ -356,6 +356,6 @@
       <div class="modal-actions"><button id="confirmCancel" class="btn secondary">Cancel</button><button id="confirmOk" class="btn primary">Continue</button></div>
     </div>
   </div>
-  <script src="/static/app.js?v=impeccable-polish-15"></script>
+  <script src="/static/app.js?v=impeccable-polish-16"></script>
 </body>
 </html>
