@@ -24,7 +24,7 @@ module.exports = {
         },
       },
       boxShadow: {
-        glow: '0 0 34px rgba(233, 69, 96, .22)',
+        glow: '0 12px 34px rgba(0, 0, 0, .22)',
         panel: '0 24px 80px rgba(0, 0, 0, .38)',
       },
       backgroundImage: {

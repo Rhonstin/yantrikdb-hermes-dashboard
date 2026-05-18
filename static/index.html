@@ -239,9 +239,9 @@
         <div class="panel scope-panel">
           <div class="panel-head"><h2>People</h2><span class="muted">who the accounts belong to</span></div>
           <form id="identityForm" class="scope-form" aria-label="Add identity">
-            <input id="identityId" placeholder="Short ID, e.g. yc" autocomplete="off" />
-            <input id="identityLabel" placeholder="Display name, e.g. Yuan Chin" autocomplete="off" />
-            <input id="identityPrivateScope" placeholder="Advanced owner ID, auto-filled if blank" autocomplete="off" />
+            <input id="identityId" placeholder="Short ID, e.g. yc" autocomplete="off" aria-label="Person short ID" />
+            <input id="identityLabel" placeholder="Display name, e.g. Yuan Chin" autocomplete="off" aria-label="Person display name" />
+            <input id="identityPrivateScope" placeholder="Advanced owner ID, auto-filled if blank" autocomplete="off" aria-label="Advanced owner ID" />
             <button id="identitySubmit" class="btn secondary" type="submit">Save person</button>
           </form>
           <div id="identityList" class="scope-list"></div>
@@ -257,8 +257,8 @@
           <details class="details-block add-actor-details">
             <summary>Add actor mapping manually</summary>
             <form id="actorForm" class="scope-form subtle-form" aria-label="Map actor to identity">
-              <input id="actorPlatform" placeholder="Platform, e.g. whatsapp" autocomplete="off" />
-              <input id="actorId" placeholder="Actor ID, e.g. 191...@lid" autocomplete="off" />
+              <input id="actorPlatform" placeholder="Platform, e.g. whatsapp" autocomplete="off" aria-label="Actor platform" />
+              <input id="actorId" placeholder="Actor ID, e.g. 191...@lid" autocomplete="off" aria-label="Actor ID" />
               <select id="actorIdentity" aria-label="Actor identity"></select>
               <button class="btn secondary" type="submit">Add actor mapping</button>
             </form>
@@ -267,9 +267,9 @@
         <div class="panel scope-panel">
           <div class="panel-head"><h2>Shared spaces</h2><span class="muted">group memory</span></div>
           <form id="spaceForm" class="scope-form" aria-label="Add shared space">
-            <input id="spaceId" placeholder="Space ID, e.g. household" autocomplete="off" />
-            <input id="spaceLabel" placeholder="Label, e.g. Household" autocomplete="off" />
-            <input id="spaceScope" placeholder="Advanced storage ID, auto-filled if blank" autocomplete="off" />
+            <input id="spaceId" placeholder="Space ID, e.g. household" autocomplete="off" aria-label="Shared space ID" />
+            <input id="spaceLabel" placeholder="Label, e.g. Household" autocomplete="off" aria-label="Shared space label" />
+            <input id="spaceScope" placeholder="Advanced storage ID, auto-filled if blank" autocomplete="off" aria-label="Advanced shared-space storage ID" />
             <div id="spaceMembersChecklist" class="checkbox-list" aria-label="Shared space members"></div>
             <button class="btn secondary" type="submit">Add shared space</button>
           </form>
@@ -279,7 +279,7 @@
           <div class="panel-head"><h2>Chat routing</h2><span class="muted">which chats use shared memory</span></div>
           <form id="conversationForm" class="scope-form" aria-label="Route chat">
             <select id="conversationPlatform" aria-label="Chat platform"></select>
-            <input id="conversationId" list="conversationIdOptions" placeholder="Chat ID" autocomplete="off" />
+            <input id="conversationId" list="conversationIdOptions" placeholder="Chat ID" autocomplete="off" aria-label="Chat ID" />
             <datalist id="conversationIdOptions"></datalist>
             <select id="conversationScope" aria-label="Chat shared space"></select>
             <button class="btn secondary" type="submit">Save chat route</button>
@@ -325,7 +325,7 @@
             </label>
             <div class="setting-row compact-number-row">
               <div><strong>Recall result count</strong><small>Default number of memories to retrieve for recall.</small><code class="config-name">top_k</code></div>
-              <input id="topKSetting" type="number" min="1" max="50" />
+              <input id="topKSetting" type="number" min="1" max="50" aria-label="Recall result count" />
               <button id="saveMemoryScoping" class="btn primary" type="button">Save memory settings</button>
             </div>
             <div class="setting-section-label">Dashboard access</div>

@@ -304,7 +304,7 @@ function renderSpaceMemberChecklist(cfg, selected=[]){
   const ids=availableIdentityOptions(cfg).filter(Boolean);
   if(!ids.length){ wrap.innerHTML='<span class="muted">Create people first, then choose members here.</span>'; return; }
   const selectedSet=new Set(selected||[]);
-  wrap.innerHTML=`<div class="checkbox-list-title">Members</div><div class="checkbox-pill-row">`+ids.map(id=>`<label class="checkbox-pill"><input type="checkbox" data-space-member value="${esc(id)}" ${selectedSet.has(id)?'checked':''} /><span>${esc(identityLabel(id,cfg))}</span></label>`).join('')+`</div>`;
+  wrap.innerHTML=`<div class="checkbox-list-title">Members</div><div class="checkbox-pill-row">`+ids.map(id=>{ const label=identityLabel(id,cfg); return `<label class="checkbox-pill"><input type="checkbox" data-space-member value="${esc(id)}" aria-label="Shared space member ${esc(label)}" ${selectedSet.has(id)?'checked':''} /><span>${esc(label)}</span></label>`; }).join('')+`</div>`;
 }
 function actorIdentityFilterOptions(cfg){
   const ids=availableIdentityOptions(cfg).filter(Boolean);

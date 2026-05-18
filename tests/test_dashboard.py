@@ -570,6 +570,36 @@ def test_copyable_diag_values_are_right_aligned():
     assert ".diag-link { @apply inline-block max-w-full break-words text-right text-yan-pink" in css_source
 
 
+def test_identity_scope_forms_have_accessible_field_names():
+    html = Path("static/index.html").read_text()
+    js = Path("static/app.js").read_text()
+    for label in [
+        "Person short ID",
+        "Person display name",
+        "Advanced owner ID",
+        "Actor platform",
+        "Actor ID",
+        "Shared space ID",
+        "Shared space label",
+        "Advanced shared-space storage ID",
+        "Chat ID",
+        "Recall result count",
+    ]:
+        assert f'aria-label="{label}"' in html
+    assert 'aria-label="Shared space member ${esc(label)}"' in js
+
+
+def test_live_audit_contrast_and_glow_are_quieter():
+    css = Path("src/styles.css").read_text()
+    tailwind = Path("tailwind.config.js").read_text()
+    assert "text-zinc-500" not in css
+    assert "text-zinc-600" not in css
+    assert "glow: '0 12px 34px rgba(0, 0, 0, .22)'" in tailwind
+    assert "0 0 34px rgba(233, 69, 96" not in tailwind
+    assert "shadow-[0_0_24px_rgba(52,211,153" not in css
+    assert "box-shadow: none;" in css
+
+
 def test_readme_documents_hermes_plugin_install_and_no_admin_token():
     readme = Path("README.md").read_text()
     assert "# YantrikDB for Hermes Dashboard" in readme
