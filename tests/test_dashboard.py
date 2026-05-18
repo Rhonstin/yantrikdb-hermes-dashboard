@@ -608,8 +608,10 @@ def test_impeccable_surface_polish_removes_raw_black_and_quiets_mobile_config_ke
     assert "ring-offset-black" not in css
     assert "input[type=\"checkbox\"]:checked::after" in css
     assert "clip-path: polygon" in css
-    assert ".config-name { display: none; }" in css
-    assert ".scope-status code { display: none; }" in css
+    assert ".config-name { @apply mt-1.5 text-[10px]; }" in css
+    assert ".scope-status code { @apply mt-1; }" in css
+    assert ".config-name { display: none; }" not in css
+    assert ".scope-status code { display: none; }" not in css
 
 
 def test_mobile_scope_and_visualiser_toolbar_css_is_compact():

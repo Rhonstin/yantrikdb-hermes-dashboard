@@ -455,8 +455,8 @@
   .setting-row { @apply gap-2 p-3.5; }
   .setting-row strong, .switch-row strong { @apply text-[0.95rem]; }
   .setting-row small, .switch-row small { @apply text-[0.82rem] leading-5; }
-  .config-name { display: none; }
-  .scope-status code { display: none; }
+  .config-name { @apply mt-1.5 text-[10px]; }
+  .scope-status code { @apply mt-1; }
   .switch-row { @apply grid-cols-[minmax(0,1fr)_auto]; }
   .switch-row .switch-control-wrap { @apply w-[56px]; }
   .password-row input { @apply w-full; }
