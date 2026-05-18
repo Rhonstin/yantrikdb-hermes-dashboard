@@ -492,3 +492,13 @@ def test_visualiser_legend_colours_match_runtime_themes():
     assert "var(--legend-entity)" in css
     assert "var(--legend-memory)" in css
     assert "var(--legend-link)" in css
+
+
+def test_memory_scoping_controls_auto_save_on_change():
+    js = Path("static/app.js").read_text()
+    assert "saveMemoryScoping" in js
+    assert "saveMemoryScopingSettings({silent:true})" in js
+    assert "#ownerScopingToggle" in js
+    assert "#includeBaseRecallToggle" in js
+    assert "#includeActorRecallToggle" in js
+    assert "#topKSetting" in js

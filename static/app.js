@@ -129,6 +129,8 @@ async function init(){
   $('#identityForm')?.addEventListener('submit', addIdentityFromForm); $('#actorForm')?.addEventListener('submit', addActorFromForm);
   $('#spaceForm')?.addEventListener('submit', addSpaceFromForm); $('#conversationForm')?.addEventListener('submit', addConversationFromForm);
   $('#runThink').onclick=runThink; $('#refreshHealth').onclick=loadHealthPanel; $('#adminModeToggle')?.addEventListener('change',()=>saveSettings());
+  $('#saveMemoryScoping')?.addEventListener('click',()=>saveMemoryScopingSettings());
+  ['#ownerScopingToggle','#includeBaseRecallToggle','#includeActorRecallToggle','#topKSetting'].forEach(sel=>$(sel)?.addEventListener('change',()=>saveMemoryScopingSettings({silent:true})));
   $('#savePassword')?.addEventListener('click',()=>saveSettings({password:true}));
   $('#disablePassword')?.addEventListener('click',()=>saveSettings({disablePassword:true}));
   $('#logoutBtn')?.addEventListener('click',logout);
@@ -474,7 +476,7 @@ async function loadSettings(){
   $('#settingsRuntime').innerHTML=settingsRows(state.settings);
   updateAdminBadge();
 }
-async function saveMemoryScopingSettings(){
+async function saveMemoryScopingSettings(opts={}){
   const payload={
     admin_mode:!!$('#adminModeToggle')?.checked,
     owner_scoping:!!$('#ownerScopingToggle')?.checked,
@@ -485,7 +487,7 @@ async function saveMemoryScopingSettings(){
   try{
     state.settings=await api('/api/settings',{method:'POST',body:JSON.stringify(payload)});
     await loadSettings();
-    toast('Memory settings saved');
+    if(!opts.silent) toast('Memory settings saved');
   }catch(e){ toast(e.message || 'Could not save memory settings'); await loadSettings(); }
 }
 
