@@ -123,6 +123,35 @@ def test_memories_all_namespaces_sql_filter(tmp_path, monkeypatch):
     assert {item["namespace"] for item in result["items"]} == {"ns:a", "ns:b"}
 
 
+def test_constellation_all_namespaces_builds_scope_hubs(tmp_path, monkeypatch):
+    db_path = tmp_path / "yantrikdb.db"
+    import sqlite3
+
+    with sqlite3.connect(db_path) as conn:
+        conn.execute("""
+            CREATE TABLE memories (
+                rid TEXT PRIMARY KEY, text TEXT, domain TEXT, source TEXT, type TEXT,
+                importance REAL, created_at REAL, updated_at REAL, access_count INTEGER,
+                consolidation_status TEXT, namespace TEXT
+            )
+        """)
+        conn.executemany(
+            "INSERT INTO memories VALUES (?,?,?,?,?,?,?,?,?,?,?)",
+            [
+                ("rid-alpha-0001", "Alpha project uses YantrikDB visualiser", "work", "user", "semantic", .9, 3, 3, 0, "active", "ns:a"),
+                ("rid-beta-0002", "Beta household memory graph", "home", "assistant", "semantic", .8, 2, 2, 0, "active", "ns:b"),
+            ],
+        )
+
+    monkeypatch.setattr(dashboard, "DB_PATH", db_path)
+    result = dashboard.constellation(namespace="__all__", limit=40)
+    labels = {node["label"] for node in result["nodes"]}
+    assert "scope:ns:a" in labels
+    assert "scope:ns:b" in labels
+    assert any(edge["kind"] == "scope" for edge in result["edges"])
+    assert {cluster["label"] for cluster in result["clusters"]} >= {"Namespace"}
+
+
 def test_index_has_memory_namespace_filter_and_maintenance_label():
     html = (Path(dashboard.STATIC_DIR) / "index.html").read_text()
     assert "memoryNamespaceFilter" in html

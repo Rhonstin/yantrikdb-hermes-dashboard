@@ -154,6 +154,7 @@ async function refreshAll(){
   await loadStats();
   if(state.view==='memories') await loadMemories();
   if(state.view==='lifecycle') await loadLifecycle();
+  if(state.view==='visualiser') await loadVisualiser(true);
 }
 
 function settingsRows(s){

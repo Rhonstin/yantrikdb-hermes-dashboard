@@ -709,15 +709,19 @@ def constellation(namespace: str = Query(DEFAULT_NAMESPACE), limit: int = Query(
     visual map from high-importance/recent memories plus lightweight local term
     extraction. No external calls, no DB mutation.
     """
+    clauses, params = namespace_clause("namespace", namespace)
+    clauses.append("consolidation_status IN ('active','consolidated')")
+    where_sql = " AND ".join(clauses)
+    memory_limit = min(limit, 320 if is_all_namespaces(namespace) else 180)
     memories = [clean_row(m) for m in rows(
-        """
-        SELECT rid,text,domain,source,type,importance,created_at,updated_at,access_count,consolidation_status
+        f"""
+        SELECT rid,text,domain,source,type,importance,created_at,updated_at,access_count,consolidation_status,namespace
         FROM memories
-        WHERE namespace=? AND consolidation_status IN ('active','consolidated')
+        WHERE {where_sql}
         ORDER BY importance DESC, created_at DESC
         LIMIT ?
         """,
-        (namespace, min(limit, 180)),
+        (*params, memory_limit),
     )]
     nodes_by_label: dict[str, dict[str, Any]] = {}
     edges: list[dict[str, Any]] = []
@@ -744,6 +748,10 @@ def constellation(namespace: str = Query(DEFAULT_NAMESPACE), limit: int = Query(
         importance = float(m.get("importance") or 0.35)
         m_node = touch(f"memory:{rid[:8]}…{rid[-6:]}", kind="memory", weight=importance * 1.8, category=category, rid=rid, preview=text)
         seeds = [m.get("domain"), m.get("source"), *_entity_terms(text, limit=4)]
+        if is_all_namespaces(namespace):
+            scope = str(m.get("namespace") or "unknown scope")
+            scope_node = touch(f"scope:{scope}", kind="namespace", weight=max(0.35, importance * 1.2), category="Namespace")
+            edges.append({"id": f"e{len(edges)+1}", "source": scope_node["id"], "target": m_node["id"], "label": "contains", "kind": "scope", "item": {"rid": rid, "namespace": scope}})
         seen: set[str] = set()
         for raw in seeds:
             entity = str(raw or "").strip()[:54]
