@@ -64,7 +64,7 @@
   .muted { @apply text-zinc-400; }
   select, input, textarea { @apply w-full min-w-0 rounded-xl border border-white/10 bg-black/35 px-3 py-2 text-[0.9375rem] leading-5 text-white outline-none transition placeholder:text-zinc-600 focus:border-yan-hot/60 focus:ring-2 focus:ring-yan-hot/20; }
   input[type="checkbox"] { @apply relative h-4 w-4 min-w-4 shrink-0 appearance-none rounded border border-white/25 bg-black/60 p-0 align-middle; }
-  input[type="checkbox"]:checked { @apply border-yan-orange bg-yan-orange; }
+  input[type="checkbox"]:checked { @apply border-emerald-400 bg-emerald-400; }
   input[type="checkbox"]:checked::after { content: '✓'; @apply absolute inset-0 flex items-center justify-center text-[12px] font-black text-black; line-height: 1; }
   label { @apply min-w-0; }
   .token-input { @apply mt-2; }
@@ -272,9 +272,9 @@
   .switch-control-wrap input[type="checkbox"] { @apply absolute inset-0 z-10 h-full w-full cursor-pointer opacity-0; }
   .switch-control { @apply pointer-events-none relative block h-7 w-[52px] rounded-full border border-white/15 bg-[#15151d] shadow-inner transition; }
   .switch-control::after { content: ''; @apply absolute left-[3px] top-[3px] h-5 w-5 rounded-full bg-zinc-300 shadow transition; }
-  .switch-control-wrap input[type="checkbox"]:checked + .switch-control { @apply border-yan-orange/55 bg-yan-orange/85 shadow-glow; }
+  .switch-control-wrap input[type="checkbox"]:checked + .switch-control { @apply border-emerald-400/55 bg-emerald-400/80 shadow-[0_0_24px_rgba(52,211,153,.20)]; }
   .switch-control-wrap input[type="checkbox"]:checked + .switch-control::after { @apply translate-x-6 bg-[#0b0b10]; }
-  .switch-control-wrap input[type="checkbox"]:focus-visible + .switch-control { @apply ring-2 ring-yan-orange/45 ring-offset-2 ring-offset-black; }
+  .switch-control-wrap input[type="checkbox"]:focus-visible + .switch-control { @apply ring-2 ring-emerald-400/45 ring-offset-2 ring-offset-black; }
   .password-card { @apply grid gap-3; }
   .password-card strong { @apply block text-white; }
   .password-card small { @apply mt-1 block text-sm text-zinc-400; }
