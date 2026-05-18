@@ -425,33 +425,50 @@ def identity_scope_payload() -> dict[str, Any]:
     stored = normalise_identity_scope_config(settings.get("identity_scope"))
     imported = load_yantrikdb_identity_scope_config()
     config = merge_identity_scope_config(stored, imported)
-    mapped_namespaces: set[str] = set()
+    scope_details: dict[str, dict[str, str]] = {}
+
+    def remember_scope(scope: str, label: str, kind: str, source: str = "configured") -> None:
+        if not scope:
+            return
+        scope_details.setdefault(str(scope), {"label": label, "kind": kind, "source": source})
+
+    identity_labels = {str(i.get("id")): str(i.get("label") or i.get("id")) for i in config["identities"] if i.get("id")}
     for ident in config["identities"]:
+        label = str(ident.get("label") or ident.get("id") or "Identity")
         if ident.get("private_scope"):
-            mapped_namespaces.add(str(ident["private_scope"]))
-            mapped_namespaces.add(owner_namespace_suffix(str(ident["private_scope"])))
+            owner = str(ident["private_scope"])
+            remember_scope(owner, label, "identity", str(ident.get("source") or "configured"))
+            remember_scope(owner_namespace_suffix(owner), label, "identity", str(ident.get("source") or "configured"))
         if ident.get("resolved_scope"):
-            mapped_namespaces.add(str(ident["resolved_scope"]))
+            remember_scope(str(ident["resolved_scope"]), label, "identity", str(ident.get("source") or "configured"))
     for actor in config["actors"]:
         raw_actor = f"{actor.get('platform')}:{actor.get('actor_id')}" if actor.get('platform') and actor.get('actor_id') else ""
+        label = identity_labels.get(str(actor.get("identity")), str(actor.get("identity") or "Unassigned"))
+        actor_label = f"{label} via {raw_actor}" if raw_actor else label
         if raw_actor:
-            mapped_namespaces.add(owner_namespace_suffix(raw_actor))
+            remember_scope(owner_namespace_suffix(raw_actor), actor_label, "actor", str(actor.get("source") or "configured"))
         if actor.get("legacy_scope"):
-            mapped_namespaces.add(str(actor["legacy_scope"]))
+            remember_scope(str(actor["legacy_scope"]), actor_label, "actor", str(actor.get("source") or "configured"))
     for space in config["spaces"]:
         if space.get("scope"):
-            mapped_namespaces.add(str(space["scope"]))
+            remember_scope(str(space["scope"]), str(space.get("label") or space.get("id") or space["scope"]), "shared_scope", str(space.get("source") or "configured"))
     for convo in config["conversations"]:
         if convo.get("scope"):
-            mapped_namespaces.add(str(convo["scope"]))
+            remember_scope(str(convo["scope"]), str(convo.get("label") or convo.get("conversation_id") or convo["scope"]), "conversation_route", str(convo.get("source") or "configured"))
     namespace_rows = rows("SELECT namespace, COUNT(*) count FROM memories GROUP BY namespace ORDER BY namespace") if table_exists("memories") else []
     inventory = []
     for row in namespace_rows:
         namespace = str(row["namespace"])
+        matched_scope = next((scope for scope in scope_details if namespace_matches_scope(namespace, scope)), "")
+        detail = scope_details.get(matched_scope, {}) if matched_scope else {}
         inventory.append({
             "namespace": namespace,
             "count": int(row["count"] or 0),
-            "mapped": any(namespace_matches_scope(namespace, scope) for scope in mapped_namespaces),
+            "mapped": bool(matched_scope),
+            "mapped_scope": matched_scope,
+            "mapped_to": detail.get("label", ""),
+            "mapping_type": detail.get("kind", ""),
+            "mapping_source": detail.get("source", ""),
         })
     summary = {
         "identities": len(config["identities"]),

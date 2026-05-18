@@ -241,10 +241,15 @@ def test_identity_scope_api_returns_config_and_unmapped_namespaces(tmp_path, mon
     data = response.json()
     assert data["summary"] == {"identities": 1, "actors": 1, "spaces": 1, "conversations": 1, "unmapped_namespaces": 0}
     assert data["identity_scope"]["spaces"][0]["scope"] == "space:team-alpha"
-    assert data["namespace_inventory"] == [
-        {"namespace": "owner:person-alpha", "count": 1, "mapped": True},
-        {"namespace": "space:team-alpha", "count": 1, "mapped": True},
-    ]
+    assert data["namespace_inventory"][0] | {"mapped_to": data["namespace_inventory"][0]["mapped_to"]} == data["namespace_inventory"][0]
+    assert data["namespace_inventory"][0]["namespace"] == "owner:person-alpha"
+    assert data["namespace_inventory"][0]["mapped"] is True
+    assert data["namespace_inventory"][0]["mapped_to"] == "Person Alpha"
+    assert data["namespace_inventory"][0]["mapping_type"] == "identity"
+    assert data["namespace_inventory"][1]["namespace"] == "space:team-alpha"
+    assert data["namespace_inventory"][1]["mapped"] is True
+    assert data["namespace_inventory"][1]["mapped_to"] == "Team Alpha"
+    assert data["namespace_inventory"][1]["mapping_type"] == "shared_scope"
 
 
 def test_identity_scope_api_persists_config_when_admin_enabled(tmp_path, monkeypatch):
@@ -278,6 +283,10 @@ def test_index_has_identity_scope_page_contract():
     assert 'id="actorForm"' in html
     assert 'id="spaceForm"' in html
     assert 'id="conversationForm"' in html
+    assert "Detected actors" in html
+    assert "who each memory bucket belongs to" in html
+    assert "Edit person" in js
+    assert "Belongs to" in js
     assert "identity-scope" in js
     assert "/api/identity-scope" in js
     assert "addIdentityFromForm" in js

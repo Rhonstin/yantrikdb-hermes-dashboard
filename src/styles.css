@@ -138,12 +138,19 @@
   .identity-summary { @apply grid grid-cols-2 gap-3 sm:grid-cols-3 xl:grid-cols-5; }
   .scope-grid { @apply grid min-w-0 grid-cols-1 gap-5 xl:grid-cols-2; }
   .scope-panel { @apply self-start; }
+  .panel-note { @apply -mt-2 mb-4 max-w-[64ch] text-sm leading-6 text-zinc-400; }
   .scope-form { @apply mb-4 grid gap-2 rounded-2xl border border-white/10 bg-black/20 p-3 sm:grid-cols-2; }
+  .scope-form.subtle-form { @apply bg-white/[.025]; }
   .scope-form input, .scope-form select { @apply min-h-10 min-w-0 rounded-xl border border-white/10 bg-black/30 px-3 py-2 text-sm text-zinc-100 outline-none transition placeholder:text-zinc-600 focus:border-yan-hot/50 focus:ring-2 focus:ring-yan-hot/20; }
   .scope-form button { @apply sm:col-span-2; }
   .scope-list { @apply grid gap-3; }
   .scope-card { @apply rounded-2xl border border-white/10 bg-white/[.035] p-4; }
-  .scope-card > strong { @apply block break-words text-sm font-semibold text-white; }
+  .scope-card-head { @apply flex items-start justify-between gap-3; }
+  .scope-card-head > strong { @apply block min-w-0 break-words text-sm font-semibold text-white; }
+  .btn.tiny { @apply min-h-0 rounded-lg px-2.5 py-1 text-[11px]; }
+  .scope-technical { @apply mt-3 text-xs text-zinc-500; }
+  .scope-technical summary { @apply cursor-pointer select-none text-zinc-500 hover:text-zinc-300; }
+  .scope-technical code { @apply mt-2 block max-w-full overflow-hidden text-ellipsis rounded-lg border border-white/10 bg-black/25 px-2 py-1 text-[11px] text-zinc-400; }
   .scope-chip-row { @apply mt-3 flex flex-wrap gap-2; }
   .scope-chip { @apply min-w-0 rounded-xl border border-white/10 bg-black/20 px-3 py-2; }
   .scope-chip span { @apply block text-[10px] font-bold uppercase tracking-[.14em] text-zinc-500; }

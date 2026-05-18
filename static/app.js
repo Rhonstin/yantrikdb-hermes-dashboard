@@ -196,25 +196,53 @@ async function refreshAll(){
 function compactJson(value){ return JSON.stringify(value||{}, null, 2); }
 function chip(label, value){ return `<div class="scope-chip"><span>${esc(label)}</span><strong>${esc(value || '—')}</strong></div>`; }
 function scopeEmpty(title, body){ return `<div class="empty helpful-empty"><strong>${esc(title)}</strong><span>${esc(body)}</span></div>`; }
+function sourceBadge(item){
+  const source=item.source==='yantrikdb_identity_map'?'Auto-detected':'Dashboard';
+  return `<span class="pill neutral">${esc(source)}</span>`;
+}
 function renderScopeRows(items, kind){
   if(!items?.length){
     const copy={
-      identities:['No identities yet.','Add canonical people or service identities in Advanced config.'],
-      actors:['No actors mapped.','Map platform IDs to identities so one person does not split into multiple owners.'],
-      spaces:['No shared scopes yet.','Create shared spaces for group chats or teams.'],
-      conversations:['No conversation routes.','Route each chat/thread to a private owner or shared scope.'],
-    }[kind] || ['Nothing configured.','Add rows in Advanced config.'];
+      identities:['No people yet.','Detected actors can be assigned once a person exists.'],
+      actors:['No actors detected yet.','When WhatsApp, Telegram, or other platforms appear in identity config, they show here automatically.'],
+      spaces:['No shared spaces yet.','Create spaces for household, team, or group-chat memory.'],
+      conversations:['No conversation routes.','Route group chats to shared spaces when needed.'],
+    }[kind] || ['Nothing configured.','Add rows below.'];
     return scopeEmpty(copy[0], copy[1]);
   }
-  return items.map(item=>{
+  return items.map((item, idx)=>{
     const title=item.label || item.name || item.id || item.actor_id || item.conversation_id || item.scope || 'Unlabelled';
-    const pieces=[];
-    if(kind==='identities') pieces.push(chip('ID', item.id), chip('Private scope', item.private_scope));
-    if(kind==='actors') pieces.push(chip('Platform', item.platform), chip('Actor', item.actor_id), chip('Identity', item.identity));
-    if(kind==='spaces') pieces.push(chip('Scope', item.scope), chip('Members', Array.isArray(item.members)?item.members.join(', '):(item.members||'')));
-    if(kind==='conversations') pieces.push(chip('Platform', item.platform), chip('Conversation', item.conversation_id), chip('Scope', item.scope));
-    return `<div class="scope-card"><strong>${esc(title)}</strong><div class="scope-chip-row">${pieces.join('')}</div></div>`;
+    const pieces=[]; let actions=''; let detail='';
+    if(kind==='identities'){
+      pieces.push(chip('Person ID', item.id), chip('Display name', item.label || item.id));
+      if(item.source) pieces.push(sourceBadge(item));
+      detail = `<details class="scope-technical"><summary>Technical owner</summary><code>${esc(item.private_scope || '')}</code>${item.resolved_scope?`<code>${esc(item.resolved_scope)}</code>`:''}</details>`;
+      actions = `<button class="btn tiny secondary" type="button" data-edit-identity="${esc(item.id||'')}">Edit person</button>`;
+    }
+    if(kind==='actors'){
+      const raw = `${item.platform||''}:${item.actor_id||''}`;
+      pieces.push(chip('Platform', item.platform), chip('Actor ID', item.actor_id), chip('Belongs to', item.identity));
+      if(item.source) pieces.push(sourceBadge(item));
+      detail = item.legacy_scope ? `<details class="scope-technical"><summary>Technical namespace</summary><code>${esc(item.legacy_scope)}</code></details>` : '';
+      actions = `<button class="btn tiny secondary" type="button" data-edit-actor="${esc(raw)}">Change owner</button>`;
+    }
+    if(kind==='spaces'){
+      pieces.push(chip('Space', item.id), chip('Members', Array.isArray(item.members)?item.members.join(', '):(item.members||'')));
+      detail = `<details class="scope-technical"><summary>Technical scope</summary><code>${esc(item.scope || '')}</code></details>`;
+      actions = `<button class="btn tiny secondary" type="button" data-edit-space="${esc(item.id||'')}">Edit space</button>`;
+    }
+    if(kind==='conversations'){
+      pieces.push(chip('Platform', item.platform), chip('Conversation', item.conversation_id), chip('Routes to', item.scope));
+      actions = `<button class="btn tiny secondary" type="button" data-edit-conversation="${esc((item.platform||'')+':'+(item.conversation_id||''))}">Edit route</button>`;
+    }
+    return `<div class="scope-card"><div class="scope-card-head"><strong>${esc(title)}</strong>${actions}</div><div class="scope-chip-row">${pieces.join('')}</div>${detail}</div>`;
   }).join('');
+}
+function bindIdentityScopeRowActions(){
+  $$('[data-edit-identity]').forEach(btn=>btn.onclick=()=>fillIdentityForm(btn.dataset.editIdentity));
+  $$('[data-edit-actor]').forEach(btn=>btn.onclick=()=>fillActorForm(btn.dataset.editActor));
+  $$('[data-edit-space]').forEach(btn=>btn.onclick=()=>fillSpaceForm(btn.dataset.editSpace));
+  $$('[data-edit-conversation]').forEach(btn=>btn.onclick=()=>fillConversationForm(btn.dataset.editConversation));
 }
 
 function identityConfig(){
@@ -261,6 +289,25 @@ async function persistIdentityConfig(cfg, message='Identity & Scope registry sav
   const data=await api('/api/identity-scope',{method:'POST',body:JSON.stringify({identity_scope:cfg})});
   renderIdentityScope(data); toast(message);
 }
+
+function fillIdentityForm(id){
+  const item=(identityConfig().identities||[]).find(i=>i.id===id); if(!item) return;
+  $('#identityId').value=item.id||''; $('#identityLabel').value=item.label||''; $('#identityPrivateScope').value=item.private_scope||'';
+  $('#identitySubmit').textContent='Update person'; $('#identityId').focus();
+}
+function fillActorForm(raw){
+  const cfg=identityConfig(); const item=(cfg.actors||[]).find(a=>`${a.platform}:${a.actor_id}`===raw); if(!item) return;
+  $('#actorPlatform').value=item.platform||''; $('#actorId').value=item.actor_id||''; renderIdentityScopeSelectors(cfg); $('#actorIdentity').value=item.identity||''; $('#actorIdentity').focus();
+}
+function fillSpaceForm(id){
+  const item=(identityConfig().spaces||[]).find(s=>s.id===id); if(!item) return;
+  $('#spaceId').value=item.id||''; $('#spaceLabel').value=item.label||''; $('#spaceScope').value=item.scope||''; $('#spaceMembers').value=Array.isArray(item.members)?item.members.join(', '):(item.members||''); $('#spaceId').focus();
+}
+function fillConversationForm(raw){
+  const cfg=identityConfig(); const item=(cfg.conversations||[]).find(c=>`${c.platform}:${c.conversation_id}`===raw); if(!item) return;
+  $('#conversationPlatform').value=item.platform||''; $('#conversationId').value=item.conversation_id||''; renderIdentityScopeSelectors(cfg); $('#conversationScope').value=item.scope||''; $('#conversationScope').focus();
+}
+
 async function addIdentityFromForm(e){
   e.preventDefault();
   const id=cleanId($('#identityId')?.value);
@@ -268,7 +315,7 @@ async function addIdentityFromForm(e){
   const cfg=identityConfig();
   const privateScope=cleanId($('#identityPrivateScope')?.value) || `owner:${id}`;
   upsertBy(cfg.identities,{id,label:cleanId($('#identityLabel')?.value)||id,private_scope:privateScope}, item=>item.id);
-  try{ await persistIdentityConfig(cfg, 'Identity added'); e.target.reset(); }catch(err){ toast(err.message || 'Could not add identity'); }
+  try{ await persistIdentityConfig(cfg, 'Person saved'); e.target.reset(); $('#identitySubmit').textContent='Save person'; }catch(err){ toast(err.message || 'Could not save person'); }
 }
 async function addActorFromForm(e){
   e.preventDefault();
@@ -304,9 +351,10 @@ function renderIdentityScope(data){
   $('#actorList').innerHTML=renderScopeRows(cfg.actors,'actors');
   $('#spaceList').innerHTML=renderScopeRows(cfg.spaces,'spaces');
   $('#conversationList').innerHTML=renderScopeRows(cfg.conversations,'conversations');
-  $('#identityNamespaceTable').innerHTML=`<table><thead><tr><th>Namespace</th><th>Rows</th><th>Mapped</th></tr></thead><tbody>${(data.namespace_inventory||[]).map(n=>`<tr><td><code>${esc(n.namespace)}</code></td><td>${fmt(n.count)}</td><td><span class="pill ${n.mapped?'neutral':'warn'}">${n.mapped?'Mapped':'Unmapped'}</span></td></tr>`).join('') || '<tr><td colspan="3">No namespaces found.</td></tr>'}</tbody></table>`;
+  $('#identityNamespaceTable').innerHTML=`<table><thead><tr><th>Namespace</th><th>Rows</th><th>Belongs to</th><th>Status</th></tr></thead><tbody>${(data.namespace_inventory||[]).map(n=>`<tr><td><code>${esc(n.namespace)}</code></td><td>${fmt(n.count)}</td><td>${n.mapped?`<strong>${esc(n.mapped_to || 'Mapped')}</strong><small>${esc((n.mapping_type || '').replace('_',' '))}</small>`:'<span class="muted">No person or space yet</span>'}</td><td><span class="pill ${n.mapped?'neutral':'warn'}">${n.mapped?'Mapped':'Needs review'}</span></td></tr>`).join('') || '<tr><td colspan="4">No namespaces found.</td></tr>'}</tbody></table>`;
   $('#identityScopeJson').value=compactJson(cfg);
   renderIdentityScopeSelectors(cfg);
+  bindIdentityScopeRowActions();
 }
 
 async function loadIdentityScope(){
