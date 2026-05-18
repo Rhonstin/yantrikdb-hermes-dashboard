@@ -42,3 +42,6 @@ node_modules/
 *.webp
 *.gif
 *.mp4
+
+# README gallery screenshots are synthetic mock data and safe to publish
+!docs/screenshots/*.png
