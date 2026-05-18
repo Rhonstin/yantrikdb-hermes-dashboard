@@ -1,5 +1,6 @@
 from pathlib import Path
 import json
+import sqlite3
 
 import pytest
 from fastapi.testclient import TestClient
@@ -334,6 +335,10 @@ def test_identity_scope_marks_config_covered_namespaces(tmp_path, monkeypatch):
 
 
 def test_identity_scope_api_persists_config_when_admin_enabled(tmp_path, monkeypatch):
+    db_path = tmp_path / "yantrikdb.db"
+    with sqlite3.connect(db_path) as conn:
+        conn.execute("CREATE TABLE memories (namespace TEXT)")
+    monkeypatch.setattr(dashboard, "DB_PATH", db_path)
     monkeypatch.setattr(dashboard, "SETTINGS_PATH", tmp_path / "settings.json")
     monkeypatch.setattr(dashboard, "YANTRIKDB_CONFIG_PATH", tmp_path / "missing-yantrikdb.json")
     monkeypatch.setattr(dashboard, "ADMIN_MODE_ENV", True)
