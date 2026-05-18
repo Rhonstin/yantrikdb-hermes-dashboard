@@ -224,6 +224,7 @@ def test_identity_scope_api_returns_config_and_unmapped_namespaces(tmp_path, mon
         conn.executemany("INSERT INTO memories VALUES (?,?)", [("r1", "owner:person-alpha"), ("r2", "space:team-alpha")])
     monkeypatch.setattr(dashboard, "DB_PATH", db_path)
     monkeypatch.setattr(dashboard, "SETTINGS_PATH", tmp_path / "settings.json")
+    monkeypatch.setattr(dashboard, "YANTRIKDB_CONFIG_PATH", tmp_path / "missing-yantrikdb.json")
     dashboard.save_dashboard_settings({
         "identity_scope": {
             "identities": [{"id": "person-alpha", "label": "Person Alpha", "private_scope": "owner:person-alpha"}],
@@ -248,6 +249,7 @@ def test_identity_scope_api_returns_config_and_unmapped_namespaces(tmp_path, mon
 
 def test_identity_scope_api_persists_config_when_admin_enabled(tmp_path, monkeypatch):
     monkeypatch.setattr(dashboard, "SETTINGS_PATH", tmp_path / "settings.json")
+    monkeypatch.setattr(dashboard, "YANTRIKDB_CONFIG_PATH", tmp_path / "missing-yantrikdb.json")
     monkeypatch.setattr(dashboard, "ADMIN_MODE_ENV", True)
     client = TestClient(dashboard.app)
     payload = {
@@ -274,3 +276,27 @@ def test_index_has_identity_scope_page_contract():
     assert 'id="identityScopeJson"' in html
     assert "identity-scope" in js
     assert "/api/identity-scope" in js
+
+
+def test_identity_scope_api_imports_yantrikdb_identity_map(tmp_path, monkeypatch):
+    import sqlite3
+
+    db_path = tmp_path / "yantrikdb.db"
+    with sqlite3.connect(db_path) as conn:
+        conn.execute("CREATE TABLE memories (rid TEXT PRIMARY KEY, namespace TEXT)")
+        conn.executemany("INSERT INTO memories VALUES (?,?)", [("r1", "owner:person-alpha"), ("r2", "hermes:hermes:default:owner:person-alpha")])
+    identity_map = tmp_path / "identity-map.json"
+    identity_map.write_text('{"owners":{"owner:person-alpha":{"actors":["chat:actor-alpha","telegram:actor-alpha"]}}}')
+    config = tmp_path / "yantrikdb.json"
+    config.write_text('{"identity_map_path":"' + str(identity_map) + '"}')
+    monkeypatch.setattr(dashboard, "DB_PATH", db_path)
+    monkeypatch.setattr(dashboard, "SETTINGS_PATH", tmp_path / "settings.json")
+    monkeypatch.setattr(dashboard, "YANTRIKDB_CONFIG_PATH", config)
+
+    data = TestClient(dashboard.app).get("/api/identity-scope").json()
+
+    assert data["summary"]["identities"] == 1
+    assert data["summary"]["actors"] == 2
+    assert data["identity_scope"]["identities"][0]["id"] == "person-alpha"
+    assert {a["platform"] for a in data["identity_scope"]["actors"]} == {"chat", "telegram"}
+    assert all(item["mapped"] for item in data["namespace_inventory"])

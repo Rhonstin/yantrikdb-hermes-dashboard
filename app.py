@@ -36,6 +36,7 @@ DB_PATH = Path(os.environ.get("YANTRIKDB_DB_PATH") or DEFAULT_DB).expanduser()
 BASE_NAMESPACE = os.environ.get("YANTRIKDB_NAMESPACE", "hermes")
 DEFAULT_NAMESPACE = os.environ.get("YANTRIKDB_DASHBOARD_NAMESPACE", f"{BASE_NAMESPACE}:hermes:default")
 SETTINGS_PATH = Path(os.environ.get("YANTRIKDB_DASHBOARD_SETTINGS_PATH") or (Path.home() / ".hermes" / "plugin-data" / "yantrikdb-dashboard" / "settings.json")).expanduser()
+YANTRIKDB_CONFIG_PATH = Path(os.environ.get("YANTRIKDB_CONFIG_PATH") or (Path.home() / ".hermes" / "yantrikdb.json")).expanduser()
 
 
 def env_bool(name: str, default: bool = False) -> bool:
@@ -335,13 +336,108 @@ def normalise_identity_scope_config(value: Any) -> dict[str, list[dict[str, Any]
     return base
 
 
+def split_actor(value: str) -> tuple[str, str]:
+    raw = str(value or "")
+    if ":" in raw:
+        platform, actor = raw.split(":", 1)
+        return platform or "unknown", actor
+    return "unknown", raw
+
+
+def safe_namespace_part(value: str) -> str:
+    text = str(value or "default")
+    slug = re.sub(r"[^a-zA-Z0-9_-]+", "-", text).strip("-").lower()[:32]
+    digest = hashlib.sha256(text.encode("utf-8")).hexdigest()[:12]
+    return f"{slug or 'owner'}-{digest}"
+
+
+def owner_namespace_suffix(owner_id: str) -> str:
+    return f"owner:{safe_namespace_part(owner_id)}"
+
+
+def load_yantrikdb_identity_scope_config() -> dict[str, list[dict[str, Any]]]:
+    if not YANTRIKDB_CONFIG_PATH.exists():
+        return default_identity_scope_config()
+    try:
+        ycfg = json.loads(YANTRIKDB_CONFIG_PATH.read_text())
+        identity_map_path = Path(str(ycfg.get("identity_map_path") or "")).expanduser()
+        if not identity_map_path.exists():
+            return default_identity_scope_config()
+        identity_map = json.loads(identity_map_path.read_text())
+    except Exception:
+        return default_identity_scope_config()
+    out = default_identity_scope_config()
+    owners = identity_map.get("owners", {}) if isinstance(identity_map, dict) else {}
+    if not isinstance(owners, dict):
+        return out
+    for owner_key, details in sorted(owners.items()):
+        if not isinstance(details, dict):
+            details = {}
+        owner = str(owner_key)
+        ident_id = owner.replace("owner:", "", 1) if owner.startswith("owner:") else owner
+        out["identities"].append({
+            "id": ident_id,
+            "label": ident_id.replace("-", " ").replace("_", " ").title(),
+            "private_scope": owner,
+            "resolved_scope": owner_namespace_suffix(owner),
+            "source": "yantrikdb_identity_map",
+        })
+        for actor_value in details.get("actors", []) if isinstance(details.get("actors", []), list) else []:
+            platform, actor_id = split_actor(str(actor_value))
+            out["actors"].append({
+                "platform": platform,
+                "actor_id": actor_id,
+                "identity": ident_id,
+                "legacy_scope": owner_namespace_suffix(str(actor_value)),
+                "source": "yantrikdb_identity_map",
+            })
+    return out
+
+
+def merge_identity_scope_config(primary: dict[str, list[dict[str, Any]]], imported: dict[str, list[dict[str, Any]]]) -> dict[str, list[dict[str, Any]]]:
+    merged = default_identity_scope_config()
+    keys = {
+        "identities": lambda item: str(item.get("id") or item.get("private_scope") or item),
+        "actors": lambda item: f"{item.get('platform','')}:{item.get('actor_id','')}",
+        "spaces": lambda item: str(item.get("id") or item.get("scope") or item),
+        "conversations": lambda item: f"{item.get('platform','')}:{item.get('conversation_id','')}",
+    }
+    for key, key_fn in keys.items():
+        seen: set[str] = set()
+        for source in (imported.get(key, []), primary.get(key, [])):
+            for item in source:
+                marker = key_fn(item)
+                if marker in seen:
+                    continue
+                merged[key].append(item)
+                seen.add(marker)
+    return merged
+
+
+def namespace_matches_scope(namespace: str, scope: str) -> bool:
+    if namespace == scope:
+        return True
+    return bool(scope and namespace.endswith(f":{scope}"))
+
+
 def identity_scope_payload() -> dict[str, Any]:
     settings = load_dashboard_settings()
-    config = normalise_identity_scope_config(settings.get("identity_scope"))
+    stored = normalise_identity_scope_config(settings.get("identity_scope"))
+    imported = load_yantrikdb_identity_scope_config()
+    config = merge_identity_scope_config(stored, imported)
     mapped_namespaces: set[str] = set()
     for ident in config["identities"]:
         if ident.get("private_scope"):
             mapped_namespaces.add(str(ident["private_scope"]))
+            mapped_namespaces.add(owner_namespace_suffix(str(ident["private_scope"])))
+        if ident.get("resolved_scope"):
+            mapped_namespaces.add(str(ident["resolved_scope"]))
+    for actor in config["actors"]:
+        raw_actor = f"{actor.get('platform')}:{actor.get('actor_id')}" if actor.get('platform') and actor.get('actor_id') else ""
+        if raw_actor:
+            mapped_namespaces.add(owner_namespace_suffix(raw_actor))
+        if actor.get("legacy_scope"):
+            mapped_namespaces.add(str(actor["legacy_scope"]))
     for space in config["spaces"]:
         if space.get("scope"):
             mapped_namespaces.add(str(space["scope"]))
@@ -349,10 +445,14 @@ def identity_scope_payload() -> dict[str, Any]:
         if convo.get("scope"):
             mapped_namespaces.add(str(convo["scope"]))
     namespace_rows = rows("SELECT namespace, COUNT(*) count FROM memories GROUP BY namespace ORDER BY namespace") if table_exists("memories") else []
-    inventory = [
-        {"namespace": str(row["namespace"]), "count": int(row["count"] or 0), "mapped": str(row["namespace"]) in mapped_namespaces}
-        for row in namespace_rows
-    ]
+    inventory = []
+    for row in namespace_rows:
+        namespace = str(row["namespace"])
+        inventory.append({
+            "namespace": namespace,
+            "count": int(row["count"] or 0),
+            "mapped": any(namespace_matches_scope(namespace, scope) for scope in mapped_namespaces),
+        })
     summary = {
         "identities": len(config["identities"]),
         "actors": len(config["actors"]),
@@ -360,7 +460,7 @@ def identity_scope_payload() -> dict[str, Any]:
         "conversations": len(config["conversations"]),
         "unmapped_namespaces": sum(1 for item in inventory if not item["mapped"]),
     }
-    return {"identity_scope": config, "namespace_inventory": inventory, "summary": summary}
+    return {"identity_scope": config, "namespace_inventory": inventory, "summary": summary, "imported_identity_scope": imported}
 
 
 @app.get("/api/identity-scope")
