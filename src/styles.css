@@ -23,7 +23,12 @@
   * { box-sizing: border-box; }
   html, body { min-height: 100%; }
   body {
-    @apply m-0 overflow-hidden bg-yan-radial text-base leading-6 antialiased font-sans text-zinc-300;
+    @apply m-0 overflow-hidden bg-yan-bg text-base leading-6 antialiased font-sans text-zinc-300;
+    background-image: radial-gradient(circle at 18% 0%, rgba(233,69,96,.20), transparent 32%), radial-gradient(circle at 86% 12%, rgba(140,140,255,.12), transparent 30%), linear-gradient(135deg, #07070a 0%, #0c0c12 54%, #09090d 100%);
+    background-attachment: fixed;
+    background-position: center top;
+    background-repeat: no-repeat;
+    background-size: 100vw 100vh;
     overflow-x: hidden;
   }
   button, input, select, textarea { font: inherit; }

@@ -592,6 +592,14 @@ def test_three_visualiser_fullscreen_overlay_is_inside_viewport():
     assert "three-fullscreen-inspector,.fullscreen-exit,.viewport-fullscreen,.constellation-legend" in js
 
 
+def test_mobile_app_background_is_fixed_across_tabs():
+    css = Path("src/styles.css").read_text()
+    assert "@apply m-0 overflow-hidden bg-yan-bg" in css
+    assert "background-attachment: fixed;" in css
+    assert "background-position: center top;" in css
+    assert "background-size: 100vw 100vh;" in css
+
+
 def test_mobile_scope_and_visualiser_toolbar_css_is_compact():
     css = Path("src/styles.css").read_text()
     assert ".scope-bar select" in css
