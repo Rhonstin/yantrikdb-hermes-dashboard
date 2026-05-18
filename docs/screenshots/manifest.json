@@ -1,0 +1,82 @@
+[
+  {
+    "file": "desktop-overview.png",
+    "view": "overview",
+    "viewport": "1440x1000",
+    "scrollWidth": 1440,
+    "clientWidth": 1440,
+    "title": "YantrikDB for Hermes"
+  },
+  {
+    "file": "desktop-visualiser.png",
+    "view": "visualiser",
+    "viewport": "1440x1000",
+    "scrollWidth": 1440,
+    "clientWidth": 1440,
+    "title": "YantrikDB for Hermes"
+  },
+  {
+    "file": "desktop-memories.png",
+    "view": "memories",
+    "viewport": "1440x1000",
+    "scrollWidth": 1440,
+    "clientWidth": 1440,
+    "title": "YantrikDB for Hermes"
+  },
+  {
+    "file": "desktop-identity-scope.png",
+    "view": "identity-scope",
+    "viewport": "1440x1000",
+    "scrollWidth": 1440,
+    "clientWidth": 1440,
+    "title": "YantrikDB for Hermes"
+  },
+  {
+    "file": "desktop-settings.png",
+    "view": "settings",
+    "viewport": "1440x1000",
+    "scrollWidth": 1440,
+    "clientWidth": 1440,
+    "title": "YantrikDB for Hermes"
+  },
+  {
+    "file": "mobile-overview.png",
+    "view": "overview",
+    "viewport": "390x844",
+    "scrollWidth": 390,
+    "clientWidth": 390,
+    "title": "YantrikDB for Hermes"
+  },
+  {
+    "file": "mobile-visualiser.png",
+    "view": "visualiser",
+    "viewport": "390x844",
+    "scrollWidth": 390,
+    "clientWidth": 390,
+    "title": "YantrikDB for Hermes"
+  },
+  {
+    "file": "mobile-identity-scope.png",
+    "view": "identity-scope",
+    "viewport": "390x844",
+    "scrollWidth": 390,
+    "clientWidth": 390,
+    "title": "YantrikDB for Hermes"
+  },
+  {
+    "file": "mobile-memories.png",
+    "view": "memories",
+    "viewport": "390x844",
+    "scrollWidth": 390,
+    "clientWidth": 390,
+    "title": "YantrikDB for Hermes"
+  },
+  {
+    "file": "mobile-settings.png",
+    "view": "settings",
+    "viewport": "390x844",
+    "scrollWidth": 390,
+    "clientWidth": 390,
+    "title": "YantrikDB for Hermes"
+  }
+]

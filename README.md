@@ -120,6 +120,26 @@ hermes gateway restart
 
 Use the `git pull` path when you want to keep a normal local checkout. Use the `hermes plugins install --force` path when you want Hermes to replace the plugin directory from the remote repo.
 
+## Screenshots
+
+The screenshots below are generated from a synthetic mock YantrikDB database. They do not contain private memory data.
+
+| Desktop | Mobile |
+| --- | --- |
+| ![Desktop overview](docs/screenshots/desktop-overview.png) | ![Mobile overview](docs/screenshots/mobile-overview.png) |
+| ![Desktop visualiser](docs/screenshots/desktop-visualiser.png) | ![Mobile visualiser](docs/screenshots/mobile-visualiser.png) |
+| ![Desktop memory browser](docs/screenshots/desktop-memories.png) | ![Mobile memory browser](docs/screenshots/mobile-memories.png) |
+| ![Desktop Identity & Scope](docs/screenshots/desktop-identity-scope.png) | ![Mobile Identity & Scope](docs/screenshots/mobile-identity-scope.png) |
+| ![Desktop settings](docs/screenshots/desktop-settings.png) | ![Mobile settings](docs/screenshots/mobile-settings.png) |
+
+Regenerate the gallery locally with:
+
+```bash
+python3 scripts/generate_mock_screenshots.py
+```
+
+The generator creates a temporary mock SQLite database, starts the dashboard on a random localhost port, captures desktop/mobile viewports, and writes the images to `docs/screenshots/`.
+
 ## Features
 
 - Overview of active, consolidated, forgotten memories, conflicts, entities, edges, DB size, and embedder

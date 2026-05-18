@@ -607,3 +607,20 @@ def test_identity_namespace_coverage_does_not_use_table_wrapper_border():
     assert 'id="identityNamespaceTable" class="table-wrap"' not in html
     css = Path("src/styles.css").read_text()
     assert ".coverage-wrap { @apply max-w-full overflow-visible rounded-none border-0 bg-transparent; }" in css
+
+
+def test_readme_documents_mock_screenshot_gallery():
+    readme = Path("README.md").read_text()
+    assert "## Screenshots" in readme
+    assert "synthetic mock YantrikDB database" in readme
+    assert "docs/screenshots/desktop-overview.png" in readme
+    assert "docs/screenshots/mobile-identity-scope.png" in readme
+    assert "docs/screenshots/mobile-settings.png" in readme
+    assert "python3 scripts/generate_mock_screenshots.py" in readme
+
+
+def test_mock_screenshot_generator_avoids_private_db_paths():
+    script = Path("scripts/generate_mock_screenshots.py").read_text()
+    assert "never reads the user's real YantrikDB memory store" in script
+    assert "/Users/wysie/.hermes/yantrikdb-memory.db" not in script
+    assert "mock-yantrikdb.db" in script
