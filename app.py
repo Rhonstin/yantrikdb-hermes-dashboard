@@ -262,6 +262,10 @@ class SettingsRequest(BaseModel):
     admin_mode: bool
     new_password: Optional[str] = None
     disable_password: bool = False
+    owner_scoping: Optional[bool] = None
+    include_base_namespace_recall: Optional[bool] = None
+    include_legacy_actor_namespace_recall: Optional[bool] = None
+    top_k: Optional[int] = None
 
 
 class IdentityScopeRequest(BaseModel):
@@ -554,6 +558,46 @@ def update_identity_scope(req: IdentityScopeRequest, request: Request) -> dict[s
     save_dashboard_settings(data)
     return identity_scope_payload()
 
+def load_yantrikdb_runtime_config() -> dict[str, Any]:
+    if not YANTRIKDB_CONFIG_PATH.exists():
+        return {}
+    try:
+        data = json.loads(YANTRIKDB_CONFIG_PATH.read_text())
+        return data if isinstance(data, dict) else {}
+    except (OSError, json.JSONDecodeError):
+        return {}
+
+
+def save_yantrikdb_runtime_config(data: dict[str, Any]) -> None:
+    YANTRIKDB_CONFIG_PATH.parent.mkdir(parents=True, exist_ok=True)
+    YANTRIKDB_CONFIG_PATH.write_text(json.dumps(data, indent=2) + "\n")
+
+
+def bool_config(value: Any, default: bool = False) -> bool:
+    if isinstance(value, bool):
+        return value
+    if value is None:
+        return default
+    return str(value).strip().lower() in {"1", "true", "yes", "on", "enabled"}
+
+
+def yantrikdb_settings_payload() -> dict[str, Any]:
+    ycfg = load_yantrikdb_runtime_config()
+    namespace = str(ycfg.get("namespace") or BASE_NAMESPACE)
+    default_namespace = f"{namespace}:hermes:default"
+    return {
+        "config_path": str(YANTRIKDB_CONFIG_PATH),
+        "mode": ycfg.get("mode") or "embedded",
+        "namespace": namespace,
+        "default_namespace": default_namespace,
+        "top_k": int(ycfg.get("top_k") or 10),
+        "owner_scoping": bool_config(ycfg.get("owner_scoping"), False),
+        "include_base_namespace_recall": bool_config(ycfg.get("include_base_namespace_recall"), True),
+        "include_legacy_actor_namespace_recall": bool_config(ycfg.get("include_legacy_actor_namespace_recall"), True),
+        "identity_map_path": str(Path(str(ycfg.get("identity_map_path") or "")).expanduser()) if ycfg.get("identity_map_path") else "",
+    }
+
+
 @app.get("/api/settings")
 def get_settings(request: Request) -> dict[str, Any]:
     stored = load_dashboard_settings()
@@ -568,6 +612,7 @@ def get_settings(request: Request) -> dict[str, Any]:
         "default_namespace": DEFAULT_NAMESPACE,
         "embedder": preferred_embedder_for_dim(infer_embedding_dim()) or os.environ.get("YANTRIKDB_EMBEDDER") or "default",
         "embedding_dim": infer_embedding_dim(),
+        "yantrikdb": yantrikdb_settings_payload(),
     }
 
 
@@ -587,6 +632,19 @@ def update_settings(req: SettingsRequest, request: Request) -> Response:
         data["password_hash"] = digest
         data["session_secret"] = secrets.token_hex(32)
         clear_cookie = True
+    if any(v is not None for v in [req.owner_scoping, req.include_base_namespace_recall, req.include_legacy_actor_namespace_recall, req.top_k]):
+        if not req.admin_mode:
+            require_admin(request)
+        ycfg = load_yantrikdb_runtime_config()
+        if req.owner_scoping is not None:
+            ycfg["owner_scoping"] = bool(req.owner_scoping)
+        if req.include_base_namespace_recall is not None:
+            ycfg["include_base_namespace_recall"] = bool(req.include_base_namespace_recall)
+        if req.include_legacy_actor_namespace_recall is not None:
+            ycfg["include_legacy_actor_namespace_recall"] = bool(req.include_legacy_actor_namespace_recall)
+        if req.top_k is not None:
+            ycfg["top_k"] = max(1, min(50, int(req.top_k)))
+        save_yantrikdb_runtime_config(ycfg)
     data["updated_at"] = now()
     save_dashboard_settings(data)
     response = JSONResponse(get_settings(request))

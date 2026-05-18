@@ -261,11 +261,14 @@
 
   .settings-layout { @apply grid min-w-0 grid-cols-1 gap-5 xl:grid-cols-[minmax(0,1.15fr)_minmax(320px,.85fr)]; }
   .setting-list { @apply divide-y divide-white/10 overflow-hidden rounded-2xl border border-white/10 bg-black/20; }
+  .setting-section-label { @apply bg-white/[.035] px-4 py-2 text-[10px] font-bold uppercase tracking-[.16em] text-zinc-500; }
   .setting-row { @apply grid min-w-0 gap-3 p-4 md:grid-cols-[minmax(0,1fr)_auto] md:items-center; }
   .setting-row strong, .switch-row strong { @apply block text-[1rem] font-semibold leading-5 text-white; }
   .setting-row small, .switch-row small { @apply mt-1 block max-w-[82ch] text-[0.9375rem] leading-6 text-zinc-400; }
   .setting-row .btn { @apply justify-self-start md:justify-self-end; }
   .password-row { @apply md:grid-cols-[minmax(0,1fr)_minmax(220px,300px)_auto]; }
+  .compact-number-row { @apply md:grid-cols-[minmax(0,1fr)_minmax(110px,150px)_auto]; }
+  .compact-number-row input { @apply w-full; }
   .export-row, .session-row { @apply bg-white/[.018]; }
   .switch-row { @apply flex flex-wrap items-center justify-between gap-4; }
   .switch-control-wrap { @apply relative inline-grid h-8 w-[56px] shrink-0 place-items-center; }

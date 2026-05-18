@@ -1,4 +1,5 @@
 from pathlib import Path
+import json
 
 import pytest
 from fastapi.testclient import TestClient
@@ -93,6 +94,44 @@ def test_disabling_password_clears_cookie_and_opens_api(tmp_path, monkeypatch):
     assert response.status_code == 200
     assert "yantrikdb_dashboard_session" in response.headers.get("set-cookie", "")
     assert client.get("/api/settings").status_code == 200
+
+
+def test_settings_exposes_and_updates_yantrikdb_runtime_config(tmp_path, monkeypatch):
+    settings_path = tmp_path / "settings.json"
+    config_path = tmp_path / "yantrikdb.json"
+    config_path.write_text(json.dumps({
+        "mode": "embedded",
+        "namespace": "hermes",
+        "top_k": "10",
+        "owner_scoping": True,
+        "include_base_namespace_recall": True,
+        "include_legacy_actor_namespace_recall": True,
+        "identity_map_path": str(tmp_path / "identity-map.json"),
+    }))
+    monkeypatch.setattr(dashboard, "SETTINGS_PATH", settings_path)
+    monkeypatch.setattr(dashboard, "YANTRIKDB_CONFIG_PATH", config_path)
+    monkeypatch.setattr(dashboard, "ADMIN_MODE_ENV", False)
+    client = TestClient(dashboard.app)
+
+    response = client.get("/api/settings")
+    assert response.status_code == 200
+    ycfg = response.json()["yantrikdb"]
+    assert ycfg["owner_scoping"] is True
+    assert ycfg["default_namespace"] == "hermes:hermes:default"
+
+    response = client.post("/api/settings", json={
+        "admin_mode": True,
+        "owner_scoping": False,
+        "include_base_namespace_recall": False,
+        "include_legacy_actor_namespace_recall": True,
+        "top_k": 7,
+    })
+    assert response.status_code == 200
+    saved = json.loads(config_path.read_text())
+    assert saved["owner_scoping"] is False
+    assert saved["include_base_namespace_recall"] is False
+    assert saved["include_legacy_actor_namespace_recall"] is True
+    assert saved["top_k"] == 7
 
 
 def test_memories_all_namespaces_sql_filter(tmp_path, monkeypatch):
@@ -278,6 +317,10 @@ def test_index_has_identity_scope_page_contract():
     assert 'data-view="identity-scope">Identity &amp; Scope</button>' in html
     assert 'id="view-identity-scope"' in html
     assert 'id="identityScopeSummary"' in html
+    assert 'id="ownerScopingToggle"' in html
+    assert 'id="includeBaseRecallToggle"' in html
+    assert 'id="includeActorRecallToggle"' in html
+    assert 'id="saveMemoryScoping"' in html
     assert 'id="identityScopeJson"' in html
     assert 'id="identityForm"' in html
     assert 'id="actorForm"' in html

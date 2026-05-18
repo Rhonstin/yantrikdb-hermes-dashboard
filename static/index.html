@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>YantrikDB Dashboard</title>
   <link rel="icon" href="/static/assets/favicon.svg?v=yantrikdb-white-favicon-2" type="image/svg+xml">
-  <link rel="stylesheet" href="/static/styles.css?v=impeccable-polish-28" />
+  <link rel="stylesheet" href="/static/styles.css?v=impeccable-polish-29" />
 </head>
 <body>
   <div class="grain"></div>
@@ -300,6 +300,25 @@
         <div class="panel settings-panel">
           <div class="panel-head"><h2>Settings</h2><span class="muted">Local controls</span></div>
           <div class="setting-list">
+            <div class="setting-section-label">Memory scoping</div>
+            <label class="setting-row switch-row">
+              <span><strong>Save memories separately per person</strong><small>YC, Sheryl, and other people get their own memory buckets.</small></span>
+              <span class="switch-control-wrap"><input id="ownerScopingToggle" type="checkbox" /><span class="switch-control" aria-hidden="true"></span></span>
+            </label>
+            <label class="setting-row switch-row">
+              <span><strong>Also search older shared memories</strong><small>Include the old shared memory bucket so older memories still show up after per-person scoping.</small></span>
+              <span class="switch-control-wrap"><input id="includeBaseRecallToggle" type="checkbox" /><span class="switch-control" aria-hidden="true"></span></span>
+            </label>
+            <label class="setting-row switch-row">
+              <span><strong>Also search old platform-account memories</strong><small>Include memories saved under old WhatsApp/Telegram account buckets before they were grouped into people.</small></span>
+              <span class="switch-control-wrap"><input id="includeActorRecallToggle" type="checkbox" /><span class="switch-control" aria-hidden="true"></span></span>
+            </label>
+            <div class="setting-row compact-number-row">
+              <div><strong>Recall result count</strong><small>Default number of memories to retrieve for recall.</small></div>
+              <input id="topKSetting" type="number" min="1" max="50" />
+              <button id="saveMemoryScoping" class="btn primary" type="button">Save memory settings</button>
+            </div>
+            <div class="setting-section-label">Dashboard access</div>
             <label class="setting-row switch-row">
               <span><strong>Admin Mode</strong><small>Allow memory-changing actions such as maintenance, conflict resolution, and forgetting memories.</small></span>
               <span class="switch-control-wrap"><input id="adminModeToggle" type="checkbox" /><span class="switch-control" aria-hidden="true"></span></span>
@@ -357,6 +376,6 @@
       <div class="modal-actions"><button id="confirmCancel" class="btn secondary">Cancel</button><button id="confirmOk" class="btn primary">Continue</button></div>
     </div>
   </div>
-  <script src="/static/app.js?v=impeccable-polish-28"></script>
+  <script src="/static/app.js?v=impeccable-polish-29"></script>
 </body>
 </html>

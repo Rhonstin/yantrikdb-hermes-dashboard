@@ -436,17 +436,48 @@ async function saveIdentityScope(){
 }
 
 function settingsRows(s){
-  const rows=[['Admin mode', s.admin_mode ? 'Enabled' : 'Read-only'],['Password', s.password_enabled ? 'Enabled' : 'Disabled'],['Launch env', s.admin_mode_env ? 'YANTRIKDB_DASHBOARD_ADMIN_MODE=true' : 'not set'],['Settings file', s.settings_path],['Database', s.db_path],['Default namespace', s.default_namespace],['Embedder', `${s.embedder} (${s.embedding_dim}d)`]];
+  const y=s.yantrikdb||{};
+  const rows=[
+    ['Admin mode', s.admin_mode ? 'Enabled' : 'Read-only'],
+    ['Password', s.password_enabled ? 'Enabled' : 'Disabled'],
+    ['Backend mode', y.mode || 'embedded'],
+    ['Base namespace', y.namespace || 'hermes'],
+    ['Default scope', y.default_namespace || s.default_namespace],
+    ['Database', s.db_path],
+    ['Provider config', y.config_path || ''],
+    ['Provider map', y.identity_map_path || 'not set'],
+    ['Embedder', `${s.embedder} (${s.embedding_dim}d)`],
+  ];
   return rows.map(([k,v])=>`<div class="diag-row"><span>${esc(k)}</span><strong>${esc(v)}</strong></div>`).join('');
 }
 async function loadSettings(){
   state.settings=await api('/api/settings');
   const toggle=$('#adminModeToggle'); if(toggle) toggle.checked=!!state.settings.admin_mode;
+  const y=state.settings.yantrikdb||{};
+  const ownerToggle=$('#ownerScopingToggle'); if(ownerToggle) ownerToggle.checked=!!y.owner_scoping;
+  const baseToggle=$('#includeBaseRecallToggle'); if(baseToggle) baseToggle.checked=!!y.include_base_namespace_recall;
+  const actorToggle=$('#includeActorRecallToggle'); if(actorToggle) actorToggle.checked=!!y.include_legacy_actor_namespace_recall;
+  const topK=$('#topKSetting'); if(topK) topK.value=y.top_k||10;
   const passwordState=$('#passwordState'); if(passwordState) passwordState.textContent=state.settings.password_enabled?'Password enabled. Changes clear saved browser sessions.':'Password disabled.';
   updateScopeUi();
   $('#settingsRuntime').innerHTML=settingsRows(state.settings);
   updateAdminBadge();
 }
+async function saveMemoryScopingSettings(){
+  const payload={
+    admin_mode:!!$('#adminModeToggle')?.checked,
+    owner_scoping:!!$('#ownerScopingToggle')?.checked,
+    include_base_namespace_recall:!!$('#includeBaseRecallToggle')?.checked,
+    include_legacy_actor_namespace_recall:!!$('#includeActorRecallToggle')?.checked,
+    top_k:Number($('#topKSetting')?.value || 10),
+  };
+  try{
+    state.settings=await api('/api/settings',{method:'POST',body:JSON.stringify(payload)});
+    await loadSettings();
+    toast('Memory settings saved');
+  }catch(e){ toast(e.message || 'Could not save memory settings'); await loadSettings(); }
+}
+
 async function saveSettings(opts={}){
   const enabled=!!$('#adminModeToggle')?.checked;
   const payload={admin_mode:enabled};
