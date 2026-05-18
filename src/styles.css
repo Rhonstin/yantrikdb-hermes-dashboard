@@ -61,8 +61,8 @@
   .side-card { @apply rounded-2xl border border-white/10 bg-white/[.045] p-3 shadow-lg backdrop-blur-xl; }
   .label { @apply mb-2 text-[10px] font-bold uppercase tracking-[.18em] text-zinc-500; }
   .mini { @apply mt-2 text-[11px] leading-4; }
-  .sidebar-credit { @apply mt-3 border-t border-white/10 pt-3 text-[11px] leading-5 text-zinc-500; }
-  .sidebar-credit a { @apply font-semibold text-zinc-300 underline decoration-white/20 underline-offset-2 transition hover:text-white hover:decoration-yan-orange/70; }
+  .sidebar-credit { @apply mt-auto rounded-2xl border border-white/[.07] bg-white/[.025] px-3 py-2 text-[11px] leading-5 text-zinc-500; }
+  .sidebar-credit a { @apply font-semibold text-zinc-300 no-underline transition hover:text-white; }
   .muted { @apply text-zinc-400; }
   select, input, textarea { @apply w-full min-w-0 rounded-xl border border-white/10 bg-black/35 px-3 py-2 text-[0.9375rem] leading-5 text-white outline-none transition placeholder:text-zinc-600 focus:border-yan-hot/60 focus:ring-2 focus:ring-yan-hot/20; }
   input[type="checkbox"] { @apply relative h-4 w-4 min-w-4 shrink-0 appearance-none rounded border border-white/25 bg-black/60 p-0 align-middle; background-image: none; }

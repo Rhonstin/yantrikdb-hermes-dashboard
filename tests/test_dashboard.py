@@ -506,7 +506,8 @@ def test_memory_scoping_controls_auto_save_on_change():
 
 def test_sidebar_credit_links_are_present():
     html = Path("static/index.html").read_text()
-    assert "Dashboard built by" in html
+    assert "Built by" in html
+    assert "YantrikDB" in html
     assert "https://github.com/wysie" in html
     assert "https://github.com/spranab" in html
     assert "https://github.com/yantrikos/y" in html
