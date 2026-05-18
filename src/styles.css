@@ -265,12 +265,14 @@
   .setting-row { @apply grid min-w-0 gap-3 p-4 md:grid-cols-[minmax(0,1fr)_auto] md:items-center; }
   .setting-row strong, .switch-row strong { @apply block text-[1rem] font-semibold leading-5 text-white; }
   .setting-row small, .switch-row small { @apply mt-1 block max-w-[82ch] text-[0.9375rem] leading-6 text-zinc-400; }
+  .config-name { @apply mt-2 inline-flex w-fit rounded-md border border-white/10 bg-white/[.035] px-2 py-1 font-mono text-[11px] font-semibold leading-none text-zinc-500; }
   .setting-row .btn { @apply justify-self-start md:justify-self-end; }
   .password-row { @apply md:grid-cols-[minmax(0,1fr)_minmax(220px,300px)_auto]; }
   .compact-number-row { @apply md:grid-cols-[minmax(0,1fr)_minmax(110px,150px)_auto]; }
   .compact-number-row input { @apply w-full; }
   .export-row, .session-row { @apply bg-white/[.018]; }
-  .switch-row { @apply flex flex-wrap items-center justify-between gap-4; }
+  .switch-row { @apply grid grid-cols-[minmax(0,1fr)_auto] items-center gap-4; }
+  .switch-row .switch-control-wrap { @apply justify-self-end; }
   .switch-control-wrap { @apply relative inline-grid h-8 w-[56px] shrink-0 place-items-center; }
   .switch-control-wrap input[type="checkbox"] { @apply absolute inset-0 z-10 h-full w-full cursor-pointer opacity-0; }
   .switch-control { @apply pointer-events-none relative block h-7 w-[52px] rounded-full border border-white/15 bg-[#15151d] shadow-inner transition; }
@@ -368,6 +370,8 @@
   .toolbar { @apply grid grid-cols-1; }
   .toolbar input:not([type="checkbox"]), .toolbar select, .toolbar button { @apply w-full min-w-0; }
   .action-row .btn, .setting-row .btn { @apply w-full; }
+  .switch-row { @apply grid-cols-[minmax(0,1fr)_auto]; }
+  .switch-row .switch-control-wrap { @apply w-[56px]; }
   .password-row input { @apply w-full; }
   .toolbar input[type="checkbox"] { @apply h-4 w-4 min-w-4 flex-none; }
   .section-tabs { @apply grid w-full grid-cols-2; }

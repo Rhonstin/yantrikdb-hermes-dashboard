@@ -321,6 +321,10 @@ def test_index_has_identity_scope_page_contract():
     assert 'id="includeBaseRecallToggle"' in html
     assert 'id="includeActorRecallToggle"' in html
     assert 'id="saveMemoryScoping"' in html
+    assert "top_k" in html
+    assert "include_legacy_actor_namespace_recall" in html
+    assert "include_base_namespace_recall" in html
+    assert "owner_scoping" in html
     assert 'id="identityScopeJson"' in html
     assert 'id="identityForm"' in html
     assert 'id="actorForm"' in html
