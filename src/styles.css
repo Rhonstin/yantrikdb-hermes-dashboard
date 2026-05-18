@@ -265,7 +265,7 @@
   .setting-row { @apply grid min-w-0 gap-3 p-4 md:grid-cols-[minmax(0,1fr)_auto] md:items-center; }
   .setting-row strong, .switch-row strong { @apply block text-[1rem] font-semibold leading-5 text-white; }
   .setting-row small, .switch-row small { @apply mt-1 block max-w-[82ch] text-[0.9375rem] leading-6 text-zinc-400; }
-  .config-name { @apply mt-1.5 inline-flex w-fit rounded border border-white/10 bg-white/[.03] px-1.5 py-0.5 font-mono text-[9px] font-semibold leading-none text-zinc-500; }
+  .config-name { @apply mt-2 inline-flex w-fit rounded-md border border-white/10 bg-white/[.035] px-2 py-1 font-mono text-[11px] font-semibold leading-none text-zinc-500; }
   .setting-row .btn { @apply justify-self-start md:justify-self-end; }
   .password-row { @apply md:grid-cols-[minmax(0,1fr)_minmax(220px,300px)_auto]; }
   .compact-number-row { @apply md:grid-cols-[minmax(0,1fr)_minmax(110px,150px)_auto]; }
@@ -293,6 +293,9 @@
   .cluster-row { @apply mb-3 flex flex-wrap gap-2; }
   .cluster-pill { @apply rounded-full border border-white/10 bg-white/[.05] px-3 py-1.5 text-xs font-bold text-zinc-300; }
   .constellation-wrap, .three-viewport {
+    --legend-entity: #ffd6dd;
+    --legend-memory: #ffa500;
+    --legend-link: #c6e0ff;
     @apply relative h-[650px] min-h-[650px] overflow-hidden rounded-[28px] border border-white/10 bg-[#05070d] shadow-panel;
     background: radial-gradient(circle at 50% 45%, rgba(233,69,96,.18), transparent 30%), radial-gradient(circle at 74% 15%, rgba(140,140,255,.13), transparent 28%), linear-gradient(180deg, rgba(5,7,13,.98), rgba(10,11,20,.95));
     touch-action: none;
@@ -300,7 +303,12 @@
     user-select: none;
     cursor: grab;
   }
-  .constellation-wrap[data-visualiser="neural"], .three-viewport[data-three-mode="neural"] { background: radial-gradient(circle at 48% 42%, rgba(34,130,111,.25), transparent 34%), radial-gradient(circle at 76% 20%, rgba(82,214,181,.12), transparent 24%), linear-gradient(180deg, rgba(5,9,15,.98), rgba(8,13,24,.94)); }
+  .constellation-wrap[data-visualiser="neural"], .three-viewport[data-three-mode="neural"] {
+    --legend-entity: #66e8c6;
+    --legend-memory: #ff9b6a;
+    --legend-link: #52d6b5;
+    background: radial-gradient(circle at 48% 42%, rgba(34,130,111,.25), transparent 34%), radial-gradient(circle at 76% 20%, rgba(82,214,181,.12), transparent 24%), linear-gradient(180deg, rgba(5,9,15,.98), rgba(8,13,24,.94));
+  }
   .constellation-layout, .three-layout { @apply grid grid-cols-1 items-stretch gap-4 xl:grid-cols-[minmax(0,1fr)_360px]; }
   .three-viewport canvas { @apply absolute inset-0 block h-full w-full; }
   .graph-inspector { @apply min-h-[420px] rounded-[28px] border border-white/10 bg-white/[.045] p-5 shadow-panel; }
@@ -308,10 +316,10 @@
   .graph-inspector h3 { @apply mt-2 text-xl font-semibold text-white; }
   .inspector-actions { @apply mt-4 flex flex-wrap gap-2; }
   .constellation-legend, .three-legend { @apply absolute bottom-4 left-4 z-10 flex flex-wrap gap-3 rounded-2xl border border-white/10 bg-black/45 px-3 py-2 text-xs font-semibold text-zinc-300 backdrop-blur-xl; }
-  .legend-dot { @apply inline-block h-2.5 w-2.5 rounded-full bg-yan-hot align-middle; }
-  .legend-dot.entity { @apply bg-yan-orange; }
-  .legend-dot.memory { @apply bg-yan-blue; }
-  .legend-line { @apply inline-block h-px w-6 bg-gradient-to-r from-yan-hot to-yan-blue align-middle; }
+  .legend-dot { @apply inline-block h-2.5 w-2.5 rounded-full align-middle; background: var(--legend-entity); box-shadow: 0 0 12px color-mix(in srgb, var(--legend-entity) 55%, transparent); }
+  .legend-dot.entity { background: var(--legend-entity); }
+  .legend-dot.memory { background: var(--legend-memory); box-shadow: 0 0 12px color-mix(in srgb, var(--legend-memory) 55%, transparent); }
+  .legend-line { @apply inline-block h-px w-6 align-middle; background: var(--legend-link); box-shadow: 0 0 10px color-mix(in srgb, var(--legend-link) 55%, transparent); }
   .three-labels { @apply pointer-events-none absolute inset-0 z-20; }
   .visualiser-loading { @apply pointer-events-none absolute inset-0 z-30 grid place-items-center bg-black/35 backdrop-blur-[2px]; }
   .visualiser-loading > span, .visualiser-loading > strong, .visualiser-loading > em { grid-area: 1 / 1; }

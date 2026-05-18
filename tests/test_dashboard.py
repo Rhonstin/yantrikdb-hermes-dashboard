@@ -479,3 +479,16 @@ def test_identity_scope_dashboard_edits_override_imported_identity_map(tmp_path,
     assert identity["label"] == "Person Alpha Edited"
     assert identity["resolved_scope"].startswith("owner:owner-person-alpha-")
     assert identity["source"] == "dashboard"
+
+
+def test_visualiser_legend_colours_match_runtime_themes():
+    css = Path("static/styles.css").read_text()
+    assert "--legend-entity:#ffd6dd" in css
+    assert "--legend-memory:orange" in css
+    assert "--legend-link:#c6e0ff" in css
+    assert "--legend-entity:#66e8c6" in css
+    assert "--legend-memory:#ff9b6a" in css
+    assert "--legend-link:#52d6b5" in css
+    assert "var(--legend-entity)" in css
+    assert "var(--legend-memory)" in css
+    assert "var(--legend-link)" in css
