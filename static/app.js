@@ -634,6 +634,7 @@ async function loadMemories(){
   $('#prevPage')?.addEventListener('click',()=>{state.memoryOffset=Math.max(0,state.memoryOffset-50);loadMemories();}); $('#nextPage')?.addEventListener('click',()=>{state.memoryOffset+=50;loadMemories();});
 }
 function statusLabel(s){ return s==='tombstoned'?'forgotten':(s||'active'); }
+function statusPillClass(s){ const v=String(s||'active'); return v==='active' ? 'good' : (v==='tombstoned' ? 'hot' : 'neutral'); }
 function shortNamespace(value){
   const raw=String(value||'');
   if(!raw) return '';
@@ -647,7 +648,7 @@ function memoryItem(m){
   return `<div class="memory-item" data-rid="${esc(m.rid)}">
     <div class="memory-headline"><div class="memory-title">${esc(m.domain||'general')} <span class="muted">· ${esc(m.type)}</span></div>${showNs?`<span class="namespace-chip" title="${esc(m.namespace||'')}">${esc(shortNamespace(m.namespace))}</span>`:''}</div>
     <div class="memory-text">${esc(m.text)}</div>
-    <div class="meta-row"><span class="pill hot">${esc(statusLabel(m.consolidation_status))}</span><span class="pill">importance ${Number(m.importance||0).toFixed(2)}</span><span class="pill">${esc(m.source||'source')}</span><span class="pill">${esc(m.created_at_iso||'')}</span></div>
+    <div class="meta-row"><span class="pill ${statusPillClass(m.consolidation_status)}">${esc(statusLabel(m.consolidation_status))}</span><span class="pill">importance ${Number(m.importance||0).toFixed(2)}</span><span class="pill">${esc(m.source||'source')}</span><span class="pill">${esc(m.created_at_iso||'')}</span></div>
   </div>`;
 }
 async function selectMemory(rid, opts={}){

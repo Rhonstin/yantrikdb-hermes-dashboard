@@ -528,3 +528,11 @@ def test_identity_scope_status_chips_have_layout_styles():
     js = Path("static/app.js").read_text()
     assert "scope-status" in js
     assert "title=\"${esc(key)}\"" in js
+
+
+def test_memory_status_active_uses_good_not_hot_pill():
+    js = Path("static/app.js").read_text()
+    assert "function statusPillClass" in js
+    assert "v==='active' ? 'good'" in js
+    assert "<span class=\"pill ${statusPillClass(m.consolidation_status)}\">" in js
+    assert "<span class=\"pill hot\">${esc(statusLabel(m.consolidation_status))}" not in js
