@@ -77,6 +77,12 @@
   .scope-kicker { @apply text-[10px] font-bold uppercase tracking-[.16em] text-zinc-500; }
   .scope-bar select { @apply min-h-8 max-w-[min(72vw,560px)] rounded-xl border-0 bg-transparent py-1 pl-0 pr-7 text-sm font-bold text-white focus:ring-0; }
   .scope-count { @apply rounded-full border border-white/10 bg-white/[.055] px-2 py-0.5 text-[11px] font-bold text-zinc-400; }
+  .scope-loading { @apply inline-flex items-center gap-1.5 rounded-full border border-yan-orange/25 bg-yan-orange/10 px-2 py-0.5 text-[11px] font-bold text-yan-orange; }
+  .scope-loading i, .loading-spinner { @apply inline-block h-3.5 w-3.5 rounded-full border-2 border-current border-t-transparent; animation: yan-spin .8s linear infinite; }
+  .scope-bar.is-loading { @apply border-yan-orange/55 bg-yan-orange/10; }
+  .scope-bar.is-loading .scope-count { @apply opacity-45; }
+  .scope-bar select:disabled { @apply cursor-wait opacity-70; }
+  .view[aria-busy="true"] { @apply opacity-75; }
   .top-actions { @apply flex flex-wrap items-center gap-2; }
 
   .btn, button.btn, a.btn { @apply inline-flex min-h-10 min-w-0 items-center justify-center gap-2 rounded-xl border border-white/10 px-4 py-2 text-[0.9375rem] font-semibold leading-5 text-white no-underline transition hover:-translate-y-0.5 hover:border-white/20 hover:bg-white/[.07] active:translate-y-0; }
@@ -243,6 +249,11 @@
   .legend-dot.memory { @apply bg-yan-blue; }
   .legend-line { @apply inline-block h-px w-6 bg-gradient-to-r from-yan-hot to-yan-blue align-middle; }
   .three-labels { @apply pointer-events-none absolute inset-0 z-20; }
+  .visualiser-loading { @apply pointer-events-none absolute inset-0 z-30 grid place-items-center bg-black/35 backdrop-blur-[2px]; }
+  .visualiser-loading > span, .visualiser-loading > strong, .visualiser-loading > em { grid-area: 1 / 1; }
+  .visualiser-loading .loading-spinner { @apply mb-20 h-9 w-9 text-yan-orange; }
+  .visualiser-loading strong { @apply mt-8 rounded-full border border-white/10 bg-black/50 px-4 py-2 text-sm font-semibold text-white shadow-panel backdrop-blur-xl; }
+  .visualiser-loading em { @apply mt-20 max-w-[260px] text-center text-xs not-italic text-zinc-400; }
   .three-label { @apply absolute rounded-full border border-white/10 bg-black/45 px-2 py-1 text-[11px] font-bold text-white shadow backdrop-blur-md; }
   .three-label.memory { @apply text-yan-pink; }
   .three-aura-layer { @apply pointer-events-none absolute inset-0; }
@@ -268,6 +279,8 @@
   .html-detail h1, .html-detail h2, .html-detail h3 { @apply mt-5 font-semibold text-white; }
   .html-detail pre { @apply rounded-2xl border border-white/10 bg-black/40 p-4 text-xs leading-6 text-blue-100; }
 }
+
+@keyframes yan-spin { to { transform: rotate(360deg); } }
 
 @layer utilities {
   .break-anywhere { overflow-wrap: anywhere; }

@@ -9,6 +9,27 @@ const viz = { frame:0, nodes:[], edges:[], byId:{}, stars:[], data:null, mode:'c
 function fmt(n){ if(n===undefined||n===null) return '—'; if(typeof n==='number') return n.toLocaleString(); return n; }
 function esc(s){ return String(s ?? '').replace(/[&<>'"]/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'}[c])); }
 function toast(msg){ const t=$('#toast'); t.textContent=msg; t.classList.add('show'); setTimeout(()=>t.classList.remove('show'),2600); }
+
+function setScopeLoading(on, label='Loading…'){
+  const scopeBar=$('#scopeBar');
+  const scopeLoading=$('#scopeLoading');
+  scopeBar?.classList.toggle('is-loading', !!on);
+  scopeLoading?.classList.toggle('hidden', !on);
+  if(scopeLoading){ scopeLoading.lastChild && (scopeLoading.lastChild.textContent=label); }
+  [$('#scopeSelect'), $('#memoryNamespaceFilter')].filter(Boolean).forEach(el=>{ el.disabled=!!on; });
+  const active=$('.view.active');
+  if(active) active.setAttribute('aria-busy', on?'true':'false');
+}
+function setVisualiserLoading(on, label='Building visualiser'){
+  const loading=$('#threeLoading');
+  loading?.classList.toggle('hidden', !on);
+  if(loading){
+    const title=loading.querySelector('strong'); if(title) title.textContent=label;
+    const detail=loading.querySelector('em'); if(detail) detail.textContent=ns()===ALL_NAMESPACES?'Preparing multiple namespace graphs…':'Preparing selected memory scope…';
+  }
+  $('#threeViewport')?.setAttribute('aria-busy', on?'true':'false');
+  ['#threeRefresh','#threeReset','#threePanMode','#threePause','#threeFullscreen'].forEach(s=>{ const el=$(s); if(el) el.disabled=!!on; });
+}
 async function api(path, opts={}){
   const headers = {'Content-Type':'application/json', ...(opts.headers||{})};
   const res = await fetch(path, {...opts, headers});
@@ -135,26 +156,34 @@ function updateScopeUi(){
   if($('#settingsExportLink')) $('#settingsExportLink').href=`/api/export/memories.jsonl?namespace=${encodeURIComponent(ns())}&status=active`;
 }
 async function refreshAll(){
-  state.health=await api('/api/health');
-  state.settings=await api('/api/settings');
-  state.defaultNamespace=state.health.default_namespace;
-  const nsRows=state.health.namespaces||[];
-  const options=`<option value="${ALL_NAMESPACES}">All namespaces (${fmt(nsRows.reduce((a,n)=>a+Number(n.count||0),0))})</option>`+nsRows.map(n=>`<option value="${esc(n.namespace)}">${esc(n.namespace)} (${fmt(n.count)})</option>`).join('');
-  const memSel=$('#memoryNamespaceFilter'); const scopeSel=$('#scopeSelect');
-  const requested=new URLSearchParams(location.search).get('namespace');
-  const prev=(requested || state.selectedNamespace || ALL_NAMESPACES);
-  state.selectedNamespace=prev;
-  [memSel,scopeSel].filter(Boolean).forEach(s=>{
-    s.innerHTML=options;
-    if(![...s.options].some(o=>o.value===prev)) s.insertAdjacentHTML('afterbegin',`<option value="${esc(prev)}">${esc(prev)}</option>`);
-    s.value=prev;
-  });
-  updateScopeUi();
-  updateAdminBadge();
-  await loadStats();
-  if(state.view==='memories') await loadMemories();
-  if(state.view==='lifecycle') await loadLifecycle();
-  if(state.view==='visualiser') await loadVisualiser(true);
+  const loadingLabel = state.view==='visualiser' ? 'Building graph…' : 'Loading…';
+  setScopeLoading(true, loadingLabel);
+  if(state.view==='visualiser') setVisualiserLoading(true, 'Building visualiser');
+  try{
+    state.health=await api('/api/health');
+    state.settings=await api('/api/settings');
+    state.defaultNamespace=state.health.default_namespace;
+    const nsRows=state.health.namespaces||[];
+    const options=`<option value="${ALL_NAMESPACES}">All namespaces (${fmt(nsRows.reduce((a,n)=>a+Number(n.count||0),0))})</option>`+nsRows.map(n=>`<option value="${esc(n.namespace)}">${esc(n.namespace)} (${fmt(n.count)})</option>`).join('');
+    const memSel=$('#memoryNamespaceFilter'); const scopeSel=$('#scopeSelect');
+    const requested=new URLSearchParams(location.search).get('namespace');
+    const prev=(requested || state.selectedNamespace || ALL_NAMESPACES);
+    state.selectedNamespace=prev;
+    [memSel,scopeSel].filter(Boolean).forEach(s=>{
+      s.innerHTML=options;
+      if(![...s.options].some(o=>o.value===prev)) s.insertAdjacentHTML('afterbegin',`<option value="${esc(prev)}">${esc(prev)}</option>`);
+      s.value=prev;
+    });
+    updateScopeUi();
+    updateAdminBadge();
+    await loadStats();
+    if(state.view==='memories') await loadMemories();
+    if(state.view==='lifecycle') await loadLifecycle();
+    if(state.view==='visualiser') await loadVisualiser(true);
+  } finally {
+    setScopeLoading(false);
+    if(state.view==='visualiser') setVisualiserLoading(false);
+  }
 }
 
 function settingsRows(s){
@@ -966,7 +995,14 @@ function animateThree(t=0){
   threeVis.renderer.render(threeVis.scene, threeVis.camera); updateThreeLabels();
   threeVis.frame = requestAnimationFrame(animateThree);
 }
-async function loadThreeVisualiser(){ renderThreeVisualiser(await api(`/api/constellation?namespace=${encodeURIComponent(ns())}&limit=320`)); }
+async function loadThreeVisualiser(){
+  setVisualiserLoading(true, 'Building visualiser');
+  try{
+    await renderThreeVisualiser(await api(`/api/constellation?namespace=${encodeURIComponent(ns())}&limit=320`));
+  } finally {
+    setVisualiserLoading(false);
+  }
+}
 function switchThreeMode(mode){ threeVis.mode = mode === 'neural' ? 'neural' : 'constellation'; if(threeVis.data) renderThreeVisualiser(threeVis.data); else loadThreeVisualiser(); }
 function clampThreeCamera(){
   const viewport = $('#threeViewport'); const rect = viewport?.getBoundingClientRect?.() || {width:650,height:650};

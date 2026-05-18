@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>YantrikDB Dashboard</title>
   <link rel="icon" href="/static/assets/favicon.svg?v=yantrikdb-white-favicon-2" type="image/svg+xml">
-  <link rel="stylesheet" href="/static/styles.css?v=impeccable-polish-6" />
+  <link rel="stylesheet" href="/static/styles.css?v=impeccable-polish-7" />
 </head>
 <body>
   <div class="grain"></div>
@@ -46,6 +46,7 @@
           <label class="scope-kicker" for="scopeSelect">Memory scope</label>
           <select id="scopeSelect" aria-label="Memory scope"></select>
           <span id="scopeCount" class="scope-count"></span>
+          <span id="scopeLoading" class="scope-loading hidden"><i></i>Loading…</span>
         </div>
       </div>
 
@@ -88,6 +89,11 @@
         <div id="threeViewport" class="three-viewport glass" aria-label="Interactive 3D YantrikDB memory visualiser">
           <button id="threeExitFullscreen" class="fullscreen-exit" aria-label="Exit fullscreen">×</button>
           <div id="threeLabels" class="three-labels"></div>
+          <div id="threeLoading" class="visualiser-loading hidden" role="status" aria-live="polite">
+            <span class="loading-spinner" aria-hidden="true"></span>
+            <strong>Building visualiser</strong>
+            <em>Preparing the selected memory scope…</em>
+          </div>
           <div id="threeLegend" class="constellation-legend three-legend"><span><i class="legend-dot entity"></i>Entity/topic</span><span><i class="legend-dot memory"></i>Memory</span><span><i class="legend-line"></i>Link</span></div>
         </div>
         <aside id="threeInspector" class="graph-inspector glass">
@@ -270,6 +276,6 @@
       <div class="modal-actions"><button id="confirmCancel" class="btn secondary">Cancel</button><button id="confirmOk" class="btn primary">Continue</button></div>
     </div>
   </div>
-  <script src="/static/app.js?v=impeccable-polish-6"></script>
+  <script src="/static/app.js?v=impeccable-polish-7"></script>
 </body>
 </html>
