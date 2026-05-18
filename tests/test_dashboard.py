@@ -512,3 +512,8 @@ def test_sidebar_credit_links_are_present():
     assert "https://github.com/spranab" in html
     assert "https://github.com/yantrikos/y" in html
     assert html.count('rel="noopener noreferrer"') >= 3
+
+
+def test_sidebar_credit_hidden_in_mobile_header():
+    css_source = Path("src/styles.css").read_text()
+    assert ".side-card, .sidebar-credit { display: none; }" in css_source

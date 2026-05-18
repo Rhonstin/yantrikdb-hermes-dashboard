@@ -367,7 +367,7 @@
   .menu-toggle { @apply flex; }
   .sidebar nav { display: none; @apply absolute left-3 right-3 top-[68px] z-[80] rounded-3xl border border-white/10 bg-[#0b0b11]/95 p-3 shadow-panel backdrop-blur-2xl; }
   body.menu-open .sidebar nav { @apply grid; }
-  .side-card { display: none; }
+  .side-card, .sidebar-credit { display: none; }
   .shell { @apply ml-0 h-auto overflow-visible px-4 py-5; }
 }
 
