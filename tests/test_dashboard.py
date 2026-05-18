@@ -600,6 +600,18 @@ def test_mobile_app_background_is_fixed_across_tabs():
     assert "background-size: 100vw 100vh;" in css
 
 
+def test_impeccable_surface_polish_removes_raw_black_and_quiets_mobile_config_keys():
+    css = Path("src/styles.css").read_text()
+    assert "--surface-35: rgba(13, 13, 22, .35);" in css
+    assert "bg-black" not in css
+    assert "border-black" not in css
+    assert "ring-offset-black" not in css
+    assert "input[type=\"checkbox\"]:checked::after" in css
+    assert "clip-path: polygon" in css
+    assert ".config-name { display: none; }" in css
+    assert ".scope-status code { display: none; }" in css
+
+
 def test_mobile_scope_and_visualiser_toolbar_css_is_compact():
     css = Path("src/styles.css").read_text()
     assert ".scope-bar select" in css
