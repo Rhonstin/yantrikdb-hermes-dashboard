@@ -1,50 +1,51 @@
-# YantrikDB Dashboard
+# YantrikDB for Hermes Dashboard
 
-A polished, local-first web dashboard for inspecting a YantrikDB memory database.
+A local-first web dashboard for browsing, visualising, and safely maintaining a YantrikDB memory store used by Hermes Agent.
 
-It is designed for private agent-memory operations: recall debugging, contradiction review, memory browsing, namespace checks, entity/graph inspection, decay signals, and read-only visualisation.
+This is not meant to be a generic YantrikDB admin console. It is an operator dashboard for Hermes memory workflows: recall debugging, Identity & Scope checks, namespace coverage, contradiction review, memory browsing, entity/graph inspection, lifecycle signals, and read-only visualisation.
 
-## Highlights
+It is intentionally private/local: FastAPI backend, static HTML/CSS/JS frontend, no cloud calls from the dashboard backend, and read-only browsing by default. Mutating actions require Admin Mode, and optional password authentication can protect the dashboard when exposed beyond localhost.
 
-- Local-only FastAPI app with a static HTML/CSS/JS frontend
-- Read-only by default; mutation endpoints require Admin Mode from Settings or `YANTRIKDB_DASHBOARD_ADMIN_MODE=true`
-- Optional dashboard password protects API access and is managed from Settings
-- Memory browser with search, filters, card grid, and detail drawer
-- Recall debugger with optional domain/source filters
-- Contradiction, entity graph, stale/upcoming, trigger, and pattern views
-- 3D memory visualiser powered by local data only
-- JSONL export for active memories
-- No external API calls from the dashboard backend
+## Installation as a Hermes plugin
 
-## Safety model
-
-The dashboard can expose sensitive memory content to whoever can reach the web UI. Bind it to `127.0.0.1` unless you intentionally want LAN access. If you expose it on LAN, set a dashboard password from Settings.
-
-Admin/mutating endpoints are disabled unless Admin Mode is enabled. Toggle it in Settings, or set `YANTRIKDB_DASHBOARD_ADMIN_MODE=true` before launch. Admin Mode is not localhost-only; use the dashboard password when exposing the service beyond localhost.
-
-## Install
+Install directly from GitHub with the Hermes plugin command:
 
 ```bash
-python3 -m venv .venv
-. .venv/bin/activate
-pip install -e .
+hermes plugins install wysie/yantrikdb-dashboard --enable
 ```
 
-You also need access to a YantrikDB SQLite database. By default the app looks for:
-
-```text
-~/.hermes/yantrikdb-memory.db
-```
-
-Override it with `YANTRIKDB_DB_PATH`.
-
-## Run
+Then restart the running Hermes process so plugin metadata is rediscovered. For the gateway:
 
 ```bash
-YANTRIKDB_DASHBOARD_HOST=127.0.0.1 \
-YANTRIKDB_DASHBOARD_PORT=8767 \
-YANTRIKDB_DB_PATH=~/.hermes/yantrikdb-memory.db \
-python app.py
+hermes gateway restart
+```
+
+Manual clone is also supported if you are developing the dashboard locally:
+
+```bash
+git clone https://github.com/wysie/yantrikdb-dashboard.git ~/.hermes/plugins/yantrikdb-dashboard
+hermes plugins enable yantrikdb-dashboard
+hermes gateway restart
+```
+
+If the directory already exists and you intentionally want to replace it, use:
+
+```bash
+hermes plugins install wysie/yantrikdb-dashboard --enable --force
+hermes gateway restart
+```
+
+`--force` deletes the existing plugin directory before reinstalling, so back up plugin-local changes first.
+
+## Starting the dashboard
+
+The plugin install gives Hermes the dashboard files. The dashboard itself is a local FastAPI web app.
+
+For a one-off local run:
+
+```bash
+cd ~/.hermes/plugins/yantrikdb-dashboard
+scripts/start.sh
 ```
 
 Then open:
@@ -53,30 +54,29 @@ Then open:
 http://127.0.0.1:8767
 ```
 
-You can also use the helper script:
+By default the dashboard reads the Hermes YantrikDB SQLite store at:
+
+```text
+~/.hermes/yantrikdb-memory.db
+```
+
+Override paths or bind address when needed:
 
 ```bash
+YANTRIKDB_DASHBOARD_HOST=127.0.0.1 \
+YANTRIKDB_DASHBOARD_PORT=8767 \
+YANTRIKDB_DB_PATH=~/.hermes/yantrikdb-memory.db \
 scripts/start.sh
 ```
 
-## Frontend styling
+## Persistent macOS service
 
-The dashboard uses a local Tailwind build, not the Tailwind CDN.
-
-```bash
-npm install
-npm run build:css
-```
-
-Source styles live in `src/styles.css`; the compiled artifact is served from `static/styles.css` so the FastAPI/launchd runtime stays a simple static app.
-
-## macOS launchd service
-
-For a persistent local dashboard that starts on login and restarts after crashes, install the LaunchAgent:
+For a dashboard that starts on login and restarts after crashes, install the LaunchAgent:
 
 ```bash
-YANTRIKDB_DASHBOARD_PYTHON=/absolute/path/to/python \
-YANTRIKDB_DASHBOARD_HOST=0.0.0.0 \
+cd ~/.hermes/plugins/yantrikdb-dashboard
+YANTRIKDB_DASHBOARD_PYTHON="$HOME/.hermes/hermes-agent/venv/bin/python" \
+YANTRIKDB_DASHBOARD_HOST=127.0.0.1 \
 YANTRIKDB_DASHBOARD_PORT=8767 \
 scripts/install-launchd.sh
 ```
@@ -87,13 +87,78 @@ The installer writes:
 ~/Library/LaunchAgents/io.yantrikdb.dashboard.local.plist
 ```
 
-It uses `RunAtLoad` plus `KeepAlive` with `SuccessfulExit=false`, so launchd restarts the dashboard if it crashes. Logs go to `.run/launchd.out.log` and `.run/launchd.err.log` by default.
-
 Uninstall:
 
 ```bash
+cd ~/.hermes/plugins/yantrikdb-dashboard
 scripts/uninstall-launchd.sh
 ```
+
+## Updating
+
+If you installed with the Hermes plugin command:
+
+```bash
+hermes plugins update yantrikdb-dashboard
+hermes gateway restart
+```
+
+If you want a clean reinstall from GitHub instead of pulling into the existing directory:
+
+```bash
+hermes plugins install wysie/yantrikdb-dashboard --enable --force
+hermes gateway restart
+```
+
+If you installed or develop the plugin as a manual git clone:
+
+```bash
+cd ~/.hermes/plugins/yantrikdb-dashboard
+git pull --ff-only
+hermes gateway restart
+```
+
+Use the `git pull` path when you want to keep a normal local checkout. Use the `hermes plugins install --force` path when you want Hermes to replace the plugin directory from the remote repo.
+
+## Features
+
+- Overview of active, consolidated, forgotten memories, conflicts, entities, edges, DB size, and embedder
+- Global namespace selector for browsing one Hermes memory scope or all scopes
+- Memory browser with search, status/domain/source filters, namespace chips, and detail drawer
+- Recall debugger with top-k, domain/source, consolidated-memory, and entity-expansion controls
+- Identity & Scope page for Hermes owner/person scoping, actor mapping, shared spaces, conversation routing, and namespace coverage
+- Contradiction review and resolution helpers
+- Entity graph inspection
+- Lifecycle and maintenance views for stale/upcoming memories, triggers, patterns, and safe housekeeping
+- Visualiser with Constellation and Neural Map modes backed by local YantrikDB data
+- JSONL export for active memories
+- Optional dashboard password managed from Settings
+
+## Safety model
+
+The dashboard can expose sensitive Hermes memory content to whoever can reach the web UI.
+
+Recommended default:
+
+```bash
+YANTRIKDB_DASHBOARD_HOST=127.0.0.1
+```
+
+Only bind to `0.0.0.0` if you intentionally want LAN access, and set a dashboard password from Settings first.
+
+There is no admin token to configure. Older admin-token style setup is obsolete. The current model is:
+
+1. Read-only browsing by default.
+2. Optional dashboard password for access control.
+3. Admin Mode for mutating operations such as maintenance, conflict resolution, and forgetting memories.
+
+Admin Mode can be toggled from Settings. For unattended local deployments, it can also be enabled at launch:
+
+```bash
+YANTRIKDB_DASHBOARD_ADMIN_MODE=true scripts/start.sh
+```
+
+Do not expose an Admin Mode dashboard without password protection.
 
 ## Configuration
 
@@ -101,26 +166,28 @@ scripts/uninstall-launchd.sh
 |---|---:|---|
 | `YANTRIKDB_DASHBOARD_HOST` | `0.0.0.0` | Bind host for Uvicorn |
 | `YANTRIKDB_DASHBOARD_PORT` | `8767` | Bind port for Uvicorn |
-| `YANTRIKDB_DB_PATH` | `~/.hermes/yantrikdb-memory.db` | SQLite DB path |
+| `YANTRIKDB_DB_PATH` | `~/.hermes/yantrikdb-memory.db` | Hermes YantrikDB SQLite DB path |
 | `YANTRIKDB_NAMESPACE` | `hermes` | Base namespace used for defaults |
 | `YANTRIKDB_DASHBOARD_NAMESPACE` | `${YANTRIKDB_NAMESPACE}:hermes:default` | Default namespace selected in UI/API |
 | `YANTRIKDB_EMBEDDING_DIM` | inferred from DB | Override embedding dimension |
 | `YANTRIKDB_EMBEDDER` | dimension-based default | Override embedder name |
 | `YANTRIKDB_DASHBOARD_ADMIN_MODE` | `false` | Enables admin mutations at launch when truthy |
-| `YANTRIKDB_DASHBOARD_SETTINGS_PATH` | `~/.hermes/plugin-data/yantrikdb-dashboard/settings.json` | Persisted dashboard settings |
+| `YANTRIKDB_DASHBOARD_SETTINGS_PATH` | `~/.hermes/plugin-data/yantrikdb-dashboard/settings.json` | Persisted dashboard settings and password config |
 | `YANTRIKDB_DASHBOARD_PYTHON` | `python3` | Python binary used by `scripts/start.sh` and `scripts/install-launchd.sh` |
 | `YANTRIKDB_DASHBOARD_LOG_DIR` | `.run` | launchd stdout/stderr directory |
 | `YANTRIKDB_DASHBOARD_LAUNCHD_LABEL` | `io.yantrikdb.dashboard.local` | macOS LaunchAgent label |
 
-## Admin endpoints
+## Frontend styling
 
-Admin operations include conflict resolution, `think()`, and forgetting memories. They remain unavailable until Admin Mode is enabled:
+The dashboard uses a local Tailwind build, not the Tailwind CDN.
 
 ```bash
-export YANTRIKDB_DASHBOARD_ADMIN_MODE=true
+cd ~/.hermes/plugins/yantrikdb-dashboard
+npm install
+npm run build:css
 ```
 
-You can also toggle Admin Mode from the dashboard Settings page. Settings also contains JSONL export and the dashboard password controls. Changing or disabling the password clears the saved browser session cookie, so the next visit must authenticate again.
+Source styles live in `src/styles.css`; the compiled artifact is served from `static/styles.css` so the FastAPI/launchd runtime stays a simple static app.
 
 ## Development
 
@@ -128,6 +195,7 @@ You can also toggle Admin Mode from the dashboard Settings page. Settings also c
 python -m py_compile app.py
 node --check static/app.js
 python -m pytest
+npm run build:css
 ```
 
 The tests avoid requiring a real YantrikDB database for basic smoke coverage.
@@ -143,6 +211,14 @@ This repo intentionally excludes:
 - private `.env` files
 
 Do not commit memory exports, live database snapshots, or screenshots containing private memory content.
+
+## Naming
+
+The dashboard UI is named “YantrikDB for Hermes” to make the integration scope clear. The current repository/plugin slug remains `yantrikdb-dashboard` for compatibility with existing installs. If the GitHub repository is renamed later, use the new `owner/repo` slug in the Hermes plugin install command.
+
+## Credits
+
+Built by [wysie](https://github.com/wysie) for Hermes Agent memory operations. Thanks to [spranab](https://github.com/spranab) for creating [YantrikDB](https://github.com/yantrikos/y).
 
 ## License
 

@@ -69,7 +69,6 @@
   input[type="checkbox"]:checked { @apply border-emerald-400 bg-emerald-400; background-image: none; }
   input[type="checkbox"]:checked::after { content: ''; @apply absolute left-1/2 top-1/2 h-2.5 w-1.5 border-b-2 border-r-2 border-black; transform: translate(-50%, -62%) rotate(45deg); }
   label { @apply min-w-0; }
-  .token-input { @apply mt-2; }
 
   .shell { @apply ml-[300px] h-screen overflow-y-auto px-7 py-6; overflow-x: hidden; }
   .topbar { @apply mb-6 flex flex-wrap items-center justify-between gap-4; }

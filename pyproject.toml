@@ -5,11 +5,11 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "yantrikdb-dashboard"
 version = "0.1.0"
-description = "Local-first dashboard for inspecting and maintaining a YantrikDB memory store"
+description = "Local-first YantrikDB dashboard for Hermes Agent memory operations"
 readme = "README.md"
 requires-python = ">=3.11"
 license = { text = "MIT" }
-authors = [{ name = "YantrikDB Dashboard contributors" }]
+authors = [{ name = "wysie" }]
 keywords = ["yantrikdb", "memory", "dashboard", "agents", "fastapi"]
 classifiers = [
   "Development Status :: 3 - Alpha",

@@ -11,7 +11,7 @@ def test_index_serves_static_html():
     client = TestClient(dashboard.app)
     response = client.get("/")
     assert response.status_code == 200
-    assert "YantrikDB Dashboard" in response.text
+    assert "YantrikDB for Hermes" in response.text
     assert "brandHome" in response.text
 
 
@@ -536,3 +536,21 @@ def test_memory_status_active_uses_good_not_hot_pill():
     assert "v==='active' ? 'good'" in js
     assert "<span class=\"pill ${statusPillClass(m.consolidation_status)}\">" in js
     assert "<span class=\"pill hot\">${esc(statusLabel(m.consolidation_status))}" not in js
+
+
+def test_readme_documents_hermes_plugin_install_and_no_admin_token():
+    readme = Path("README.md").read_text()
+    assert "# YantrikDB for Hermes Dashboard" in readme
+    assert "hermes plugins install wysie/yantrikdb-dashboard --enable" in readme
+    assert "hermes plugins update yantrikdb-dashboard" in readme
+    assert "There is no admin token to configure" in readme
+    assert "Admin Mode" in readme
+    assert "Dashboard password" in readme or "dashboard password" in readme
+
+
+def test_product_metadata_uses_hermes_positioning():
+    assert "YantrikDB for Hermes" in Path("static/index.html").read_text()
+    assert "YantrikDB for Hermes" in Path("app.py").read_text()
+    plugin = Path("plugin.yaml").read_text()
+    assert "Hermes Agent memory operations" in plugin
+    assert "author: wysie" in plugin
