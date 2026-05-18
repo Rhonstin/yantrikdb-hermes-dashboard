@@ -424,13 +424,14 @@ function renderIdentityScope(data){
   $('#actorList').innerHTML=renderScopeRows(filteredActors(cfg),'actors');
   $('#spaceList').innerHTML=renderScopeRows(cfg.spaces,'spaces');
   $('#conversationList').innerHTML=renderScopeRows(cfg.conversations,'conversations');
-  $('#identityNamespaceTable').innerHTML=`<table><thead><tr><th>Namespace</th><th>Rows</th><th>Belongs to</th><th>Status</th></tr></thead><tbody>${(data.namespace_inventory||[]).map(n=>{
+  $('#identityNamespaceTable').innerHTML=(data.namespace_inventory||[]).length ? `<div class="namespace-coverage-list">${(data.namespace_inventory||[]).map(n=>{
     const type=(n.mapping_type || '').replaceAll('_',' ');
     const source=n.mapping_source ? ` · ${n.mapping_source}` : '';
     const belongs=n.mapped?`<div class="mapped-owner"><strong>${esc(n.mapped_to || 'Mapped')}</strong><span>${esc(type + source)}</span></div>`:'<span class="muted">No person, shared space, or enabled fallback yet</span>';
     const status=n.mapped?(n.derived_by_config?'Covered by settings':'Mapped'):'Needs review';
-    return `<tr><td><code>${esc(n.namespace)}</code></td><td>${fmt(n.count)}</td><td>${belongs}</td><td><span class="pill ${n.mapped?'neutral':'warn'}">${esc(status)}</span></td></tr>`;
-  }).join('') || '<tr><td colspan="4">No namespaces found.</td></tr>'}</tbody></table>`;
+    const pillClass=n.mapped?(n.derived_by_config?'good':'neutral'):'warn';
+    return `<article class="namespace-coverage-card"><div class="namespace-coverage-head"><div><span class="coverage-label">Namespace</span><code title="${esc(n.namespace)}">${esc(n.namespace)}</code></div><span class="pill coverage-status ${pillClass}">${esc(status)}</span></div><div class="namespace-coverage-body"><div><span class="coverage-label">Rows</span><strong>${fmt(n.count)}</strong></div><div><span class="coverage-label">Belongs to</span>${belongs}</div></div></article>`;
+  }).join('')}</div>` : scopeEmpty('No namespaces found.','Memory buckets will appear here once YantrikDB has rows.');
   $('#identityScopeJson').value=compactJson(cfg);
   renderIdentityScopeSelectors(cfg);
   bindIdentityScopeRowActions();

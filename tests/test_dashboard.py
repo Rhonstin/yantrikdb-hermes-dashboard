@@ -587,3 +587,15 @@ def test_visualiser_fullscreen_mobile_label_is_short():
     html = Path("static/index.html").read_text()
     assert 'id="threeFullscreen" class="btn secondary" aria-label="Fullscreen">Full</button>' in html
     assert "Drag to rotate · Pinch to zoom · Pan to move." in html
+
+
+def test_identity_namespace_coverage_uses_mobile_cards():
+    js = Path("static/app.js").read_text()
+    assert "namespace-coverage-list" in js
+    assert "namespace-coverage-card" in js
+    assert "coverage-status" in js
+    assert "<table><thead><tr><th>Namespace</th><th>Rows</th><th>Belongs to</th><th>Status</th>" not in js
+    css = Path("src/styles.css").read_text()
+    assert ".namespace-coverage-head { @apply grid" in css
+    assert ".coverage-status" in css
+    assert "whitespace-normal" in css
