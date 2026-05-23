@@ -354,6 +354,15 @@
     --legend-link: #52d6b5;
     background: radial-gradient(circle at 48% 42%, rgba(34,130,111,.25), transparent 34%), radial-gradient(circle at 76% 20%, rgba(82,214,181,.12), transparent 24%), linear-gradient(180deg, rgba(5,9,15,.98), rgba(8,13,24,.94));
   }
+  .three-viewport[data-three-mode="city"] {
+    --legend-entity: #ffd166;
+    --legend-memory: #7dd3fc;
+    --legend-link: #f59e0b;
+    background:
+      radial-gradient(circle at 50% 68%, rgba(245,158,11,.18), transparent 34%),
+      radial-gradient(circle at 78% 18%, rgba(125,211,252,.12), transparent 24%),
+      linear-gradient(180deg, rgba(5,7,11,.98), rgba(12,14,20,.96));
+  }
   .constellation-layout, .three-layout { @apply grid grid-cols-1 items-stretch gap-4 xl:grid-cols-[minmax(0,1fr)_360px]; }
   .three-viewport canvas { @apply absolute inset-0 block h-full w-full; image-rendering: auto; }
   .graph-inspector { @apply min-h-[420px] rounded-[28px] border border-white/10 bg-white/[.045] p-5 shadow-panel; }

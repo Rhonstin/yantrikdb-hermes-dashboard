@@ -66,6 +66,20 @@ def test_three_visualiser_css_has_bounded_viewport():
     assert "height:100%" in css
 
 
+def test_memory_city_visualiser_contract():
+    html = (Path(dashboard.STATIC_DIR) / "index.html").read_text()
+    js = (Path(dashboard.STATIC_DIR) / "app.js").read_text()
+    css = (Path(dashboard.STATIC_DIR) / "styles.css").read_text()
+
+    assert 'data-three-mode="city">Memory City</button>' in html
+    assert "Memory City inspector" in js
+    assert "buildThreeCityPositions" in js
+    assert "addMemoryCity" in js
+    assert "District landmark" in js
+    assert "Memory building" in js
+    assert 'data-three-mode=city' in css
+
+
 def test_password_gate_login_and_cookie_rotation(tmp_path, monkeypatch):
     monkeypatch.setattr(dashboard, "SETTINGS_PATH", tmp_path / "settings.json")
     monkeypatch.setattr(dashboard, "ADMIN_MODE_ENV", False)

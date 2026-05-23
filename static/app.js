@@ -746,6 +746,9 @@ function constellationColors(){
 function neuralColors(){
   return { light:false, bg:'#050915', star:'#66e8c6', memory:'#ff9b6a', text:'rgba(244,248,255,.92)' };
 }
+function cityColors(){
+  return { light:false, bg:'#06070b', star:'#ffd166', memory:'#7dd3fc', text:'rgba(248,250,252,.94)' };
+}
 let threeModulePromise = null;
 let threeVis = {
   mode: 'constellation', data: null, renderer: null, scene: null, camera: null, group: null,
@@ -758,11 +761,13 @@ function loadThreeModule(){
   return threeModulePromise;
 }
 function threeInspectorDefault(){
-  const neural = threeVis.mode === 'neural';
+  const mode = threeVis.mode;
   threeVis.selectedNode = null;
-  const insp=$('#threeInspector'); if(insp) insp.innerHTML = neural
+  const insp=$('#threeInspector'); if(insp) insp.innerHTML = mode === 'neural'
     ? `<div class="inspector-kicker">Neural inspector</div><h3>Nothing selected</h3><p class="muted">Pick a neuron hub, memory soma, or synapse to inspect the underlying read-only source.</p>`
-    : `<div class="inspector-kicker">Constellation inspector</div><h3>Nothing selected</h3><p class="muted">Pick a star, memory, or link to inspect the underlying read-only source.</p>`;
+    : mode === 'city'
+      ? `<div class="inspector-kicker">Memory City inspector</div><h3>Nothing selected</h3><p class="muted">Pick a district, landmark, or memory building to inspect the underlying read-only source.</p>`
+      : `<div class="inspector-kicker">Constellation inspector</div><h3>Nothing selected</h3><p class="muted">Pick a star, memory, or link to inspect the underlying read-only source.</p>`;
   hideThreeFullscreenInspector();
 }
 function hideThreeFullscreenInspector(){
@@ -777,7 +782,7 @@ function exitFullscreenThen(fn){
   else run();
 }
 function threeInspectorMarkup(node, target='panel'){
-  const mode = threeVis.mode === 'neural' ? 'Neural Map 3D' : 'Constellation 3D';
+  const mode = threeVis.mode === 'neural' ? 'Neural Map 3D' : (threeVis.mode === 'city' ? 'Memory City 3D' : 'Constellation 3D');
   const overlay = target === 'overlay';
   const memoryId = overlay ? 'threeOverlayMemory' : 'threeMemory';
   const searchId = overlay ? 'threeOverlaySearch' : 'threeSearch';
@@ -820,13 +825,15 @@ function updateThreeUI(){
   const legend = $('#threeLegend');
   if(legend) legend.innerHTML = threeVis.mode === 'neural'
     ? '<span><i class="legend-dot entity"></i>Neuron hub</span><span><i class="legend-dot memory"></i>Memory soma</span><span><i class="legend-line"></i>Synapse</span>'
-    : '<span><i class="legend-dot entity"></i>Entity/topic</span><span><i class="legend-dot memory"></i>Memory</span><span><i class="legend-line"></i>Link</span>';
-  const help = $('#threeHelp'); if(help) help.textContent = 'Drag to rotate · Right-click/Shift+drag to pan · Wheel/pinch to zoom.';
+    : threeVis.mode === 'city'
+      ? '<span><i class="legend-dot entity"></i>District landmark</span><span><i class="legend-dot memory"></i>Memory building</span><span><i class="legend-line"></i>Recall road</span>'
+      : '<span><i class="legend-dot entity"></i>Entity/topic</span><span><i class="legend-dot memory"></i>Memory</span><span><i class="legend-line"></i>Link</span>';
+  const help = $('#threeHelp'); if(help) help.textContent = threeVis.mode === 'city' ? 'Drag to orbit the city · Right-click/Shift+drag to pan · Wheel/pinch to zoom.' : 'Drag to rotate · Right-click/Shift+drag to pan · Wheel/pinch to zoom.';
   const compact = window.matchMedia('(max-width: 760px)').matches;
-  const pause = $('#threePause'); if(pause) pause.textContent = threeVis.paused ? (compact ? 'Resume' : (threeVis.mode === 'neural' ? 'Resume drift' : 'Resume rotation')) : (compact ? 'Pause' : (threeVis.mode === 'neural' ? 'Pause drift' : 'Pause rotation'));
+  const pause = $('#threePause'); if(pause) pause.textContent = threeVis.paused ? (compact ? 'Resume' : (threeVis.mode === 'neural' ? 'Resume drift' : (threeVis.mode === 'city' ? 'Resume traffic' : 'Resume rotation'))) : (compact ? 'Pause' : (threeVis.mode === 'neural' ? 'Pause drift' : (threeVis.mode === 'city' ? 'Pause traffic' : 'Pause rotation')));
   const pan = $('#threePanMode'); if(pan) pan.textContent = threeVis.panMode ? (compact ? 'Orbit' : 'Orbit mode') : (compact ? 'Pan' : 'Pan mode');
 }
-function resetThreeCamera(){ Object.assign(threeVis, { yaw: threeVis.mode === 'neural' ? .12 : .70, pitch: threeVis.mode === 'neural' ? .10 : .96, cameraZ: threeVis.mode === 'neural' ? 600 : 760, panX:0, panY: threeVis.mode === 'neural' ? -10 : -84, lastT:0 }); }
+function resetThreeCamera(){ Object.assign(threeVis, { yaw: threeVis.mode === 'neural' ? .12 : (threeVis.mode === 'city' ? .62 : .70), pitch: threeVis.mode === 'neural' ? .10 : (threeVis.mode === 'city' ? .72 : .96), cameraZ: threeVis.mode === 'neural' ? 600 : (threeVis.mode === 'city' ? 1180 : 760), panX:0, panY: threeVis.mode === 'neural' ? -10 : (threeVis.mode === 'city' ? -24 : -84), lastT:0 }); }
 function clearThreeScene(){
   if(threeVis.frame) cancelAnimationFrame(threeVis.frame);
   threeVis.frame = 0;
@@ -839,13 +846,13 @@ function cssHexToInt(hex){
   return m ? parseInt(m[1], 16) : 0xffffff;
 }
 function colorForTheme(){
-  const c = threeVis.mode === 'neural' ? neuralColors() : constellationColors();
+  const c = threeVis.mode === 'neural' ? neuralColors() : (threeVis.mode === 'city' ? cityColors() : constellationColors());
   return {
     bg: cssHexToInt(c.bg),
     entity: cssHexToInt(c.star),
     memory: cssHexToInt(c.memory),
-    link: cssHexToInt(threeVis.mode === 'neural' ? (c.light ? '#127464' : '#52d6b5') : (c.light ? '#19416c' : '#c6e0ff')),
-    pulse: cssHexToInt(threeVis.mode === 'neural' ? (c.light ? '#6f6048' : '#fffaf0') : c.memory),
+    link: cssHexToInt(threeVis.mode === 'neural' ? (c.light ? '#127464' : '#52d6b5') : (threeVis.mode === 'city' ? '#f59e0b' : (c.light ? '#19416c' : '#c6e0ff'))),
+    pulse: cssHexToInt(threeVis.mode === 'neural' ? (c.light ? '#6f6048' : '#fffaf0') : (threeVis.mode === 'city' ? '#fff7ad' : c.memory)),
     text: c.text,
     light: c.light
   };
@@ -929,6 +936,7 @@ function makePointTexture(THREE, kind){
 }
 function buildThreePositions(data){
   if(threeVis.mode === 'neural') return buildThreeNeuralPositions(data);
+  if(threeVis.mode === 'city') return buildThreeCityPositions(data);
   const nodes = (data.nodes || []).slice(0,160).map(n => ({...n}));
   const categories = [...new Set(nodes.map(n => n.category || 'Other'))];
   const catIndex = Object.fromEntries(categories.map((c,i)=>[c,i]));
@@ -1018,10 +1026,92 @@ function buildThreeNeuralPositions(data){
   threeVis.neuralRegions = Object.values(regions);
   return nodes;
 }
+function buildThreeCityPositions(data){
+  const nodes = (data.nodes || []).slice(0,190).map(n => ({...n}));
+  const categories = [...new Set(nodes.map(n => n.category || 'Other'))];
+  const cols = Math.ceil(Math.sqrt(Math.max(1, categories.length)));
+  const districtSize = 210;
+  const districts = Object.fromEntries(categories.map((cat, i) => {
+    const col = i % cols;
+    const row = Math.floor(i / cols);
+    return [cat, {
+      label: cat,
+      cx: (col - (cols - 1) / 2) * districtSize,
+      cz: (row - Math.floor((categories.length - 1) / cols) / 2) * districtSize,
+      index: i,
+      count: nodes.filter(n => (n.category || 'Other') === cat).length,
+    }];
+  }));
+  const byCategoryRank = {};
+  nodes.forEach(n => { const cat=n.category || 'Other'; if(!byCategoryRank[cat]) byCategoryRank[cat]=0; });
+  nodes.forEach((n, i) => {
+    const cat = n.category || 'Other';
+    const district = districts[cat] || {cx:0,cz:0,index:0};
+    const rank = byCategoryRank[cat]++;
+    const memory = n.kind === 'memory';
+    const weight = Math.max(1, Number(n.weight || n.count || 1));
+    const grid = Math.ceil(Math.sqrt(Math.max(1, (district.count || 1))));
+    const gx = rank % grid;
+    const gz = Math.floor(rank / grid);
+    const spacing = memory ? 24 : 32;
+    const jitterX = (((i * 37) % 17) - 8) * .8;
+    const jitterZ = (((i * 53) % 19) - 9) * .75;
+    n.cityHeight = memory ? Math.min(96, 16 + Math.sqrt(weight) * 18 + Number(n.count || 0) * .9) : Math.min(132, 34 + Math.sqrt(weight) * 22);
+    n.cityWidth = memory ? 15 + (i % 4) * 3 : 24 + (i % 3) * 5;
+    n.cityDepth = memory ? 16 + (i % 5) * 2 : 24 + (i % 4) * 4;
+    n.x = district.cx + (gx - (grid - 1) / 2) * spacing + jitterX;
+    n.z = district.cz + (gz - (grid - 1) / 2) * spacing + jitterZ;
+    n.y = n.cityHeight / 2;
+    n.size = Math.max(15, Math.min(44, n.cityWidth + Math.sqrt(weight) * 4));
+    n._degree = 0; n._weight = weight; n.cityDistrict = cat;
+  });
+  threeVis.cityDistricts = Object.values(districts);
+  return nodes;
+}
+function addMemoryCity(THREE, group, nodes, edges, colors){
+  const districtGeom = new THREE.PlaneGeometry(172, 172, 1, 1);
+  (threeVis.cityDistricts || []).forEach((d, i) => {
+    const mat = new THREE.MeshBasicMaterial({ color: i % 2 ? 0x101827 : 0x11121b, transparent:true, opacity:.78, side:THREE.DoubleSide, depthWrite:false });
+    const plane = new THREE.Mesh(districtGeom, mat);
+    plane.rotation.x = -Math.PI / 2;
+    plane.position.set(d.cx, -1.2, d.cz);
+    group.add(plane);
+    const ring = new THREE.LineSegments(new THREE.EdgesGeometry(districtGeom), new THREE.LineBasicMaterial({ color:colors.link, transparent:true, opacity:.28 }));
+    ring.rotation.x = -Math.PI / 2;
+    ring.position.copy(plane.position);
+    group.add(ring);
+  });
+  const roadPositions=[];
+  edges.forEach(e => {
+    roadPositions.push(e.a.x, 1.2, e.a.z, e.b.x, 1.2, e.b.z);
+  });
+  if(roadPositions.length){
+    const roadGeom = new THREE.BufferGeometry(); roadGeom.setAttribute('position', new THREE.BufferAttribute(new Float32Array(roadPositions),3));
+    group.add(new THREE.LineSegments(roadGeom, new THREE.LineBasicMaterial({ color:colors.link, transparent:true, opacity:.20, depthWrite:false })));
+  }
+  nodes.forEach((n,i) => {
+    const memory = n.kind === 'memory';
+    const geom = new THREE.BoxGeometry(n.cityWidth || 18, n.cityHeight || 34, n.cityDepth || 18);
+    const baseColor = memory ? colors.memory : colors.entity;
+    const mat = new THREE.MeshStandardMaterial({ color:baseColor, emissive:baseColor, emissiveIntensity: memory ? .18 : .32, roughness:.52, metalness:.08, transparent:true, opacity: memory ? .86 : .94 });
+    const mesh = new THREE.Mesh(geom, mat);
+    mesh.position.set(n.x, n.y, n.z);
+    mesh.userData.node = n;
+    group.add(mesh);
+    const edge = new THREE.LineSegments(new THREE.EdgesGeometry(geom), new THREE.LineBasicMaterial({ color:0xffffff, transparent:true, opacity:memory ? .16 : .24 }));
+    edge.position.copy(mesh.position);
+    group.add(edge);
+    if((memory && (Number(n._weight || 0) > 4 || i % 9 === 0)) || !memory){
+      const light = new THREE.PointLight(baseColor, memory ? .25 : .42, memory ? 80 : 120);
+      light.position.set(n.x, n.cityHeight + 8, n.z);
+      group.add(light);
+    }
+  });
+}
 function limitedThreeEdges(data, byId, mobile=false){
   const degree = new Map(); const out=[];
-  const limit = threeVis.mode === 'neural' ? 132 : (mobile ? 92 : 140);
-  const degreeLimit = threeVis.mode === 'neural' ? 5 : (mobile ? 3 : 4);
+  const limit = threeVis.mode === 'neural' ? 132 : (threeVis.mode === 'city' ? (mobile ? 72 : 110) : (mobile ? 92 : 140));
+  const degreeLimit = threeVis.mode === 'neural' ? 5 : (threeVis.mode === 'city' ? 3 : (mobile ? 3 : 4));
   for(const e of (data.edges || [])){
     const a=byId.get(e.source), b=byId.get(e.target); if(!a || !b) continue;
     const da=degree.get(e.source)||0, db=degree.get(e.target)||0; if(da>=degreeLimit || db>=degreeLimit) continue;
@@ -1256,14 +1346,19 @@ async function renderThreeVisualiser(data){
   const ambient = new THREE.AmbientLight(0xffffff, .55); scene.add(ambient);
   const light = new THREE.PointLight(colors.entity, 1.2, 1200); light.position.set(180,220,260); scene.add(light);
   const nodes = buildThreePositions(data); const byId = new Map(nodes.map(n=>[n.id,n])); const edges = limitedThreeEdges(data, byId, mobileThree);
-  const linkGeom = buildThreeLinkSegments(THREE, edges);
+  let linkGeom = null;
   const linkMaterial = threeVis.mode === 'neural'
     ? new THREE.LineBasicMaterial({ color:colors.link, transparent:true, opacity:colors.light ? .30 : .40, blending:colors.light ? THREE.NormalBlending : THREE.AdditiveBlending, depthWrite:false })
     : new THREE.LineDashedMaterial({ color:colors.link, transparent:true, opacity:colors.light ? (mobileThree ? .14 : .16) : (mobileThree ? .13 : .12), dashSize:9, gapSize:8, blending:THREE.NormalBlending, depthWrite:false });
-  const linkLines = new THREE.LineSegments(linkGeom, linkMaterial);
-  if(threeVis.mode !== 'neural') linkLines.computeLineDistances();
-  group.add(linkLines);
-  if(threeVis.mode === 'neural'){
+  if(threeVis.mode !== 'city'){
+    linkGeom = buildThreeLinkSegments(THREE, edges);
+    const linkLines = new THREE.LineSegments(linkGeom, linkMaterial);
+    if(threeVis.mode !== 'neural') linkLines.computeLineDistances();
+    group.add(linkLines);
+  }
+  if(threeVis.mode === 'city'){
+    addMemoryCity(THREE, group, nodes, edges, colors);
+  } else if(threeVis.mode === 'neural'){
     addHaloPoints(THREE, group, nodes, 'entity', colors.entity, 50);
     addHaloPoints(THREE, group, nodes, 'memory', colors.memory, 48);
     addNeuralDendrites(THREE, group, nodes, colors);
@@ -1271,17 +1366,19 @@ async function renderThreeVisualiser(data){
     // Constellation already has per-star shader halos. A separate halo layer made
     // the mobile view read like blurry particles instead of the original star map.
   }
-  group.add(addPoints(THREE, group, nodes, 'entity', colors.entity, threeVis.mode === 'neural' ? 30 : 52));
-  group.add(addPoints(THREE, group, nodes, 'memory', colors.memory, threeVis.mode === 'neural' ? 26 : 50));
-  const starCount = threeVis.mode === 'neural' ? 360 : 420;
+  if(threeVis.mode !== 'city'){
+    group.add(addPoints(THREE, group, nodes, 'entity', colors.entity, threeVis.mode === 'neural' ? 30 : 52));
+    group.add(addPoints(THREE, group, nodes, 'memory', colors.memory, threeVis.mode === 'neural' ? 26 : 50));
+  }
+  const starCount = threeVis.mode === 'city' ? 180 : (threeVis.mode === 'neural' ? 360 : 420);
   const starPositions = new Float32Array(starCount*3);
   for(let i=0;i<starCount;i++){ const r=600+((i*37)%480), a=i*2.17, b=((i*53)%180-90)*Math.PI/180; starPositions.set([Math.cos(a)*Math.cos(b)*r, Math.sin(b)*r, Math.sin(a)*Math.cos(b)*r], i*3); }
   const starGeom = new THREE.BufferGeometry(); starGeom.setAttribute('position', new THREE.BufferAttribute(starPositions,3));
-  scene.add(new THREE.Points(starGeom, new THREE.PointsMaterial({ color:0xffffff, map:makePointTexture(THREE, 'orb'), alphaTest:.04, size:1.25, transparent:true, opacity:threeVis.mode === 'neural' ? .38 : .24, depthWrite:false })));
-  const pulseEdges = threeVis.mode === 'neural' ? edges.slice(0, 90) : [];
+  scene.add(new THREE.Points(starGeom, new THREE.PointsMaterial({ color:0xffffff, map:makePointTexture(THREE, 'orb'), alphaTest:.04, size:1.25, transparent:true, opacity:threeVis.mode === 'city' ? .16 : (threeVis.mode === 'neural' ? .38 : .24), depthWrite:false })));
+  const pulseEdges = threeVis.mode === 'neural' ? edges.slice(0, 90) : (threeVis.mode === 'city' ? edges.slice(0, 80) : []);
   const pulseGeom = new THREE.BufferGeometry(); const pulsePositions = new Float32Array(pulseEdges.length*3); pulseGeom.setAttribute('position', new THREE.BufferAttribute(pulsePositions,3));
-  const pulsePoints = new THREE.Points(pulseGeom, new THREE.PointsMaterial({ color:colors.pulse, map:makePointTexture(THREE, 'star'), alphaTest:.03, size:threeVis.mode === 'neural' ? 10.5 : 5.2, transparent:true, opacity:threeVis.mode === 'neural' ? (colors.light ? .54 : .98) : .85, depthWrite:false, depthTest:false, blending:colors.light ? THREE.NormalBlending : THREE.AdditiveBlending })); group.add(pulsePoints);
-  const labelNodes = nodes.filter(n => !/^[a-f0-9]{10,}$/i.test(String(n.label||''))).sort((a,b)=>(b._degree+b._weight)-(a._degree+a._weight)).slice(0, threeVis.mode === 'neural' ? 72 : 56);
+  const pulsePoints = new THREE.Points(pulseGeom, new THREE.PointsMaterial({ color:colors.pulse, map:makePointTexture(THREE, 'star'), alphaTest:.03, size:threeVis.mode === 'city' ? 8.5 : (threeVis.mode === 'neural' ? 10.5 : 5.2), transparent:true, opacity:threeVis.mode === 'neural' ? (colors.light ? .54 : .98) : (threeVis.mode === 'city' ? .92 : .85), depthWrite:false, depthTest:false, blending:colors.light ? THREE.NormalBlending : THREE.AdditiveBlending })); group.add(pulsePoints);
+  const labelNodes = nodes.filter(n => !/^[a-f0-9]{10,}$/i.test(String(n.label||''))).sort((a,b)=>(b._degree+b._weight)-(a._degree+a._weight)).slice(0, threeVis.mode === 'city' ? 42 : (threeVis.mode === 'neural' ? 72 : 56));
   $('#threeLabels').innerHTML = neuralAuraOverlay(threeVis.neuralRegions) + labelNodes.map((n,i)=>`<span class="three-label ${n.kind === 'memory' ? 'memory' : ''}" data-i="${i}">${esc(String(n.label||'').replace(/^memory:/,'mem ').slice(0,24))}</span>`).join('');
   Object.assign(threeVis, { THREE, renderer, scene, camera, group, nodes, edgePairs:edges, labels:labelNodes, pulses:pulseEdges, pulsePoints });
   $('#threeClusters').innerHTML = (data.clusters || []).map(c => `<span class="cluster-pill">${esc(c.label)} <strong>${Number(c.count).toLocaleString()}</strong></span>`).join('');
@@ -1329,7 +1426,7 @@ function updateThreeLabels(){
   const labelBoxes = [];
   const effectiveCameraZ = threeEffectiveCameraZ(rect);
   const zoomReveal = threeVis.mode === 'neural' ? Math.max(0, Math.min(1, (900 - effectiveCameraZ) / 420)) : Math.max(0, Math.min(1, (760 - effectiveCameraZ) / 520));
-  const maxLabels = threeVis.mode === 'neural' ? ((rect.width < 520 ? 14 : 24) + Math.round(zoomReveal * (rect.width < 520 ? 14 : 18))) : (rect.width < 520 ? (12 + Math.round(zoomReveal * 12)) : (20 + Math.round(zoomReveal * 18)));
+  const maxLabels = threeVis.mode === 'city' ? (rect.width < 520 ? 8 : 16) : (threeVis.mode === 'neural' ? ((rect.width < 520 ? 14 : 24) + Math.round(zoomReveal * (rect.width < 520 ? 14 : 18))) : (rect.width < 520 ? (12 + Math.round(zoomReveal * 12)) : (20 + Math.round(zoomReveal * 18))));
   let shown = 0;
   $$('#threeLabels .three-label').forEach((el,i)=>{
     const n = threeVis.labels[i]; if(!n) return;
@@ -1355,7 +1452,7 @@ function animateThree(t=0){
   if(!threeVis.renderer) return;
   resizeThree();
   const delta = threeVis.lastT ? Math.min(48, t - threeVis.lastT) : 16; threeVis.lastT = t;
-  if(!threeVis.paused && !threeVis.drag) threeVis.yaw += delta * (threeVis.mode === 'neural' ? .00009 : .000055);
+  if(!threeVis.paused && !threeVis.drag) threeVis.yaw += delta * (threeVis.mode === 'neural' ? .00009 : (threeVis.mode === 'city' ? .000035 : .000055));
   clampThreeCamera();
   threeVis.group.rotation.y = threeVis.yaw; threeVis.group.rotation.x = threeVis.pitch;
   const viewport = $('#threeViewport'); const rect = viewport?.getBoundingClientRect?.() || {width:650,height:650};
@@ -1363,7 +1460,7 @@ function animateThree(t=0){
   threeVis.camera.position.set(threeVis.panX, threeVis.panY, effectiveCameraZ); threeVis.camera.lookAt(threeVis.panX, threeVis.panY, 0);
   if(threeVis.pulsePoints){
     const attr = threeVis.pulsePoints.geometry.attributes.position; const arr = attr.array;
-    threeVis.pulses.forEach((e,i)=>{ const phase=(t*.00030 + (i%17)/17)%1; const inv=1-phase; if(e._curve){ arr[i*3]=inv*inv*e.a.x+2*inv*phase*e._curve.cx+phase*phase*e.b.x; arr[i*3+1]=inv*inv*e.a.y+2*inv*phase*e._curve.cy+phase*phase*e.b.y; arr[i*3+2]=inv*inv*e.a.z+2*inv*phase*e._curve.cz+phase*phase*e.b.z; } else { arr[i*3]=e.a.x+(e.b.x-e.a.x)*phase; arr[i*3+1]=e.a.y+(e.b.y-e.a.y)*phase; arr[i*3+2]=e.a.z+(e.b.z-e.a.z)*phase; } });
+    threeVis.pulses.forEach((e,i)=>{ const phase=(t*.00030 + (i%17)/17)%1; const inv=1-phase; if(e._curve){ arr[i*3]=inv*inv*e.a.x+2*inv*phase*e._curve.cx+phase*phase*e.b.x; arr[i*3+1]=inv*inv*e.a.y+2*inv*phase*e._curve.cy+phase*phase*e.b.y; arr[i*3+2]=inv*inv*e.a.z+2*inv*phase*e._curve.cz+phase*phase*e.b.z; } else if(threeVis.mode === 'city'){ arr[i*3]=e.a.x+(e.b.x-e.a.x)*phase; arr[i*3+1]=8+Math.sin(phase*Math.PI)*28; arr[i*3+2]=e.a.z+(e.b.z-e.a.z)*phase; } else { arr[i*3]=e.a.x+(e.b.x-e.a.x)*phase; arr[i*3+1]=e.a.y+(e.b.y-e.a.y)*phase; arr[i*3+2]=e.a.z+(e.b.z-e.a.z)*phase; } });
     attr.needsUpdate = true;
   }
   threeVis.scene.traverse(obj => {
@@ -1383,10 +1480,10 @@ async function loadThreeVisualiser(){
     setVisualiserLoading(false);
   }
 }
-function switchThreeMode(mode){ threeVis.mode = mode === 'neural' ? 'neural' : 'constellation'; if(threeVis.data) renderThreeVisualiser(threeVis.data); else loadThreeVisualiser(); }
+function switchThreeMode(mode){ threeVis.mode = ['neural','city'].includes(mode) ? mode : 'constellation'; if(threeVis.data) renderThreeVisualiser(threeVis.data); else loadThreeVisualiser(); }
 function clampThreeCamera(){
   const viewport = $('#threeViewport'); const rect = viewport?.getBoundingClientRect?.() || {width:650,height:650};
-  const fallbackZ = threeVis.mode === 'neural' ? 600 : 760;
+  const fallbackZ = threeVis.mode === 'neural' ? 600 : (threeVis.mode === 'city' ? 1180 : 760);
   const minCameraZ = fallbackZ / 10;
   threeVis.cameraZ = Math.max(minCameraZ, Math.min(1800, Number.isFinite(threeVis.cameraZ) ? threeVis.cameraZ : fallbackZ));
   threeVis.yaw = Number.isFinite(threeVis.yaw) ? threeVis.yaw : 0;
