@@ -80,6 +80,7 @@ def test_memory_city_visualiser_contract():
     assert "layout_district" in js
     assert "healthStateForNode" in js
     assert "threeRunRecall" in html
+    assert "threeRunRecall')?.addEventListener('click',runVisualiserRecall" in js
     assert "runVisualiserRecall" in js
     assert 'data-three-mode=city' in css
 

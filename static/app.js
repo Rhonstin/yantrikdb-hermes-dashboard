@@ -131,6 +131,8 @@ async function init(){
   $('#threePause')?.addEventListener('click',()=>{ threeVis.paused=!threeVis.paused; updateThreeUI(); });
   $('#threeFullscreen')?.addEventListener('click',()=>$('#threeViewport')?.requestFullscreen?.());
   $('#threeExitFullscreen')?.addEventListener('click',()=>document.exitFullscreen?.());
+  $('#threeRunRecall')?.addEventListener('click',runVisualiserRecall);
+  $('#threeRecallQuery')?.addEventListener('keydown',(e)=>{ if(e.key==='Enter') runVisualiserRecall(); });
   document.addEventListener('fullscreenchange',()=>{ if(state.view==='visualiser') requestAnimationFrame(()=>resizeThree()); });
   $$('.visualiser-tabs button[data-three-mode]').forEach(b=>b.onclick=()=>setVisualiserMode(b.dataset.threeMode));
   $('#loadEntities').onclick=loadEntities; $('#loadGraph').onclick=()=>loadGraph($('#graphEntity').value||$('#entitySearch').value);
