@@ -84,6 +84,8 @@ def test_memory_city_visualiser_contract():
     assert "runVisualiserRecall" in js
     assert "addReplayBeacons" in js
     assert "replayStateForNode(a) === 'included'" in js
+    assert "preserveView" in js
+    assert "renderThreeVisualiser(buildRecallOverlayData(threeVis.data, results), {preserveView:true})" in js
     assert 'data-three-mode=city' in css
 
 

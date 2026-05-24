@@ -1428,7 +1428,12 @@ function buildThreeLinkSegments(THREE, edges){
   geometry.setAttribute('position', new THREE.BufferAttribute(new Float32Array(positions),3));
   return geometry;
 }
-async function renderThreeVisualiser(data){
+async function renderThreeVisualiser(data, opts={}){
+  const preserveView = !!opts.preserveView;
+  const viewState = preserveView ? {
+    yaw: threeVis.yaw, pitch: threeVis.pitch, cameraZ: threeVis.cameraZ,
+    panX: threeVis.panX, panY: threeVis.panY, paused: threeVis.paused, panMode: threeVis.panMode
+  } : null;
   const THREE = await loadThreeModule();
   clearThreeScene(); threeVis.data = data; updateThreeUI(); threeInspectorDefault();
   const viewport = $('#threeViewport'); if(!viewport) return;
@@ -1496,7 +1501,9 @@ async function renderThreeVisualiser(data){
   $('#threeLabels').innerHTML = neuralAuraOverlay(threeVis.neuralRegions) + labelNodes.map((n,i)=>`<span class="three-label ${n.kind === 'memory' ? 'memory' : ''}" data-i="${i}">${esc(String(n.label||'').replace(/^memory:/,'mem ').slice(0,24))}</span>`).join('');
   Object.assign(threeVis, { THREE, renderer, scene, camera, group, nodes, edgePairs:edges, labels:labelNodes, pulses:pulseEdges, pulsePoints });
   $('#threeClusters').innerHTML = (data.clusters || []).map(c => `<span class="cluster-pill">${esc(c.label)} <strong>${Number(c.count).toLocaleString()}</strong></span>`).join('');
-  resetThreeCamera(); bindThreeControls(); resizeThree(); animateThree(0);
+  if(preserveView && viewState) Object.assign(threeVis, viewState);
+  else resetThreeCamera();
+  bindThreeControls(); resizeThree(); animateThree(0);
 }
 function resizeThree(){
   if(!threeVis.renderer) return;
@@ -1600,7 +1607,7 @@ async function runVisualiserRecall(){
     results.forEach(r => String([r.domain,r.source,...(r.why_retrieved||r.reasons||[])].join(' ')).toLowerCase().split(/[^a-z0-9_.:-]+/).filter(x=>x.length>3).slice(0,8).forEach(x=>terms.add(x)));
     threeVis.replay = { query, results }; threeVis.replayNodes = rids; threeVis.replayEntities = terms; threeVis.replayEdges = new Set();
     $('#threeReplayStatus').innerHTML = `<strong>Recall replay</strong><span>${esc(query)} · ${results.length} hit(s), injected into view</span>`;
-    if(threeVis.data) await renderThreeVisualiser(buildRecallOverlayData(threeVis.data, results));
+    if(threeVis.data) await renderThreeVisualiser(buildRecallOverlayData(threeVis.data, results), {preserveView:true});
   } catch(e){ toast(e.message); }
   finally{ if(btn){ btn.disabled = false; btn.textContent = old || 'Replay recall'; } }
 }
