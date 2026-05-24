@@ -754,7 +754,7 @@ let threeVis = {
   mode: 'constellation', data: null, renderer: null, scene: null, camera: null, group: null,
   nodes: [], edgePairs: [], labels: [], pulses: [], frame: 0, paused: false, panMode: false,
   drag: null, pointer: new Map(), yaw: 0, pitch: 0.32, cameraZ: 780, panX: 0, panY: 0, lastT: 0,
-  selectedNode: null
+  selectedNode: null, replay: null, replayNodes: new Set(), replayEdges: new Set()
 };
 function loadThreeModule(){
   if(!threeModulePromise) threeModulePromise = import('/static/vendor/three.module.min.js');
@@ -788,7 +788,11 @@ function threeInspectorMarkup(node, target='panel'){
   const searchId = overlay ? 'threeOverlaySearch' : 'threeSearch';
   const close = overlay ? '<button id="threeOverlayClose" class="btn ghost tiny" aria-label="Close fullscreen inspector">Close</button>' : '';
   const preview = node.preview ? `<p>${esc(node.preview)}</p>` : '';
-  return `<div class="inspector-kicker">${mode} · ${esc(node.kind || 'entity')}</div><h3>${esc(node.label)}</h3><p class="muted">${esc(node.category || 'Other')} · ${Number(node.count || 0).toLocaleString()} signal(s) · weight ${Number(node.weight || 0).toFixed(2)}</p>${preview}<div class="inspector-actions">${node.memory_id ? `<button id="${memoryId}" class="btn primary tiny">Open memory</button>` : ''}<button id="${searchId}" class="btn secondary tiny">Search this</button>${close}</div>`;
+  const replay = replayStateForNode(node);
+  const health = node.health?.tags?.length ? ` · ${node.health.tags.join(', ')}` : '';
+  const group = node.layout_district || node.layout_region || node.category || 'Other';
+  const replayCopy = replay ? `<span class="pill good">recall replay: ${esc(replay)}</span>` : '';
+  return `<div class="inspector-kicker">${mode} · ${esc(node.kind || 'entity')}</div><h3>${esc(node.label)}</h3><p class="muted">${esc(group)} · ${Number(node.count || 0).toLocaleString()} signal(s) · weight ${Number(node.weight || 0).toFixed(2)}${esc(health)}</p>${preview}<div class="meta-row">${replayCopy}</div><div class="inspector-actions">${node.memory_id ? `<button id="${memoryId}" class="btn primary tiny">Open memory</button>` : ''}<button id="${searchId}" class="btn secondary tiny">Search this</button>${close}</div>`;
 }
 function bindThreeInspectorActions(node, target='panel'){
   const overlay = target === 'overlay';
@@ -868,6 +872,21 @@ function threeRenderPixelRatio(viewport){
   const areaCap = Math.sqrt(maxPixels / Math.max(1, rect.width * rect.height));
   return Math.max(1, Math.min(base * qualityBoost, cap, areaCap));
 }
+function visualGroupForNode(n, mode=threeVis.mode){
+  if(mode === 'city') return n.layout_district || n.layout_region || n.category || 'Other';
+  if(mode === 'neural') return n.layout_region || n.category || 'Other';
+  return n.layout_region || n.category || 'Other';
+}
+function semanticGroupForNode(n){ return n.semantic_category || n.category || 'Other'; }
+function replayStateForNode(n){
+  if(!threeVis.replayNodes || !n) return null;
+  const rid = String(n.memory_id || '').trim();
+  if(rid && threeVis.replayNodes.has(rid)) return 'included';
+  if(n.kind !== 'memory' && threeVis.replayEntities?.has(String(n.label || '').toLowerCase())) return 'candidate';
+  return null;
+}
+function healthStateForNode(n){ return n?.health?.state || 'steady'; }
+
 function makePointTexture(THREE, kind){
   const canvas = document.createElement('canvas');
   canvas.width = 256; canvas.height = 256;
@@ -938,10 +957,10 @@ function buildThreePositions(data){
   if(threeVis.mode === 'neural') return buildThreeNeuralPositions(data);
   if(threeVis.mode === 'city') return buildThreeCityPositions(data);
   const nodes = (data.nodes || []).slice(0,160).map(n => ({...n}));
-  const categories = [...new Set(nodes.map(n => n.category || 'Other'))];
+  const categories = [...new Set(nodes.map(n => visualGroupForNode(n, 'constellation')))];
   const catIndex = Object.fromEntries(categories.map((c,i)=>[c,i]));
   nodes.forEach((n,i) => {
-    const cat = n.category || 'Other';
+    const cat = visualGroupForNode(n, 'constellation');
     const ci = catIndex[cat] || 0;
     const weight = Math.max(1, Number(n.weight || n.count || 1));
     const shell = n.kind === 'memory' ? 1.12 : .74 + (ci % 3) * .10;
@@ -960,7 +979,7 @@ function buildThreePositions(data){
     const twinkleTier = i % 17 === 0 ? 2 : (i % 5 === 0 ? 1 : 0);
     n.twinkleFreq = twinkleTier === 2 ? .0048 + ((i * 41) % 130) / 100000 : (twinkleTier === 1 ? .0024 + ((i * 47) % 120) / 100000 : .00125 + ((i * 53) % 110) / 100000);
     n.twinkleAmp = twinkleTier === 2 ? .34 : (twinkleTier === 1 ? .24 : .15 + ((i * 29) % 70) / 1000);
-    n._degree = 0; n._weight = weight;
+    n._degree = 0; n._weight = weight; n.visualGroup = cat;
   });
   return nodes;
 }
@@ -968,7 +987,7 @@ function buildThreeNeuralPositions(data){
   const nodes = (data.nodes || []).slice(0,170).map(n => ({...n}));
   const nodeIds = new Set(nodes.map(n => n.id));
   const edges = (data.edges || []).filter(e => nodeIds.has(e.source) && nodeIds.has(e.target)).slice(0,340);
-  const categories = [...new Set(nodes.map(n => n.category || 'Other'))];
+  const categories = [...new Set(nodes.map(n => visualGroupForNode(n, 'neural')))];
   const catIndex = Object.fromEntries(categories.map((c,i)=>[c,i]));
   const regionCount = Math.max(1, categories.length);
   const regions = Object.fromEntries(categories.map((cat, i) => {
@@ -988,11 +1007,11 @@ function buildThreeNeuralPositions(data){
   edges.forEach(e => { degree.set(e.source, (degree.get(e.source) || 0) + 1); degree.set(e.target, (degree.get(e.target) || 0) + 1); });
   const hubsByCategory = {};
   nodes.filter(n => n.kind !== 'memory').sort((a,b)=>(Number(b.weight || b.count || 0)+ (degree.get(b.id)||0)) - (Number(a.weight || a.count || 0)+(degree.get(a.id)||0))).forEach(n => {
-    const cat = n.category || 'Other'; if(!hubsByCategory[cat]) hubsByCategory[cat] = []; hubsByCategory[cat].push(n);
+    const cat = visualGroupForNode(n, 'neural'); if(!hubsByCategory[cat]) hubsByCategory[cat] = []; hubsByCategory[cat].push(n);
   });
   const byId = Object.fromEntries(nodes.map(n => [n.id, n]));
   nodes.forEach((n,i) => {
-    const cat = n.category || 'Other';
+    const cat = visualGroupForNode(n, 'neural');
     const region = regions[cat] || regions.Other || { cx:0, cy:0, cz:0, angle:0, spread:80 };
     const ci = catIndex[cat] || 0;
     const weight = Math.max(1, Number(n.weight || n.count || 1));
@@ -1028,7 +1047,7 @@ function buildThreeNeuralPositions(data){
 }
 function buildThreeCityPositions(data){
   const nodes = (data.nodes || []).slice(0,190).map(n => ({...n}));
-  const categories = [...new Set(nodes.map(n => n.category || 'Other'))];
+  const categories = [...new Set(nodes.map(n => visualGroupForNode(n, 'city')))];
   const cols = Math.ceil(Math.sqrt(Math.max(1, categories.length)));
   const districtSize = 210;
   const districts = Object.fromEntries(categories.map((cat, i) => {
@@ -1043,9 +1062,9 @@ function buildThreeCityPositions(data){
     }];
   }));
   const byCategoryRank = {};
-  nodes.forEach(n => { const cat=n.category || 'Other'; if(!byCategoryRank[cat]) byCategoryRank[cat]=0; });
+  nodes.forEach(n => { const cat=visualGroupForNode(n, 'city'); if(!byCategoryRank[cat]) byCategoryRank[cat]=0; });
   nodes.forEach((n, i) => {
-    const cat = n.category || 'Other';
+    const cat = visualGroupForNode(n, 'city');
     const district = districts[cat] || {cx:0,cz:0,index:0};
     const rank = byCategoryRank[cat]++;
     const memory = n.kind === 'memory';
@@ -1092,8 +1111,14 @@ function addMemoryCity(THREE, group, nodes, edges, colors){
   nodes.forEach((n,i) => {
     const memory = n.kind === 'memory';
     const geom = new THREE.BoxGeometry(n.cityWidth || 18, n.cityHeight || 34, n.cityDepth || 18);
-    const baseColor = memory ? colors.memory : colors.entity;
-    const mat = new THREE.MeshStandardMaterial({ color:baseColor, emissive:baseColor, emissiveIntensity: memory ? .18 : .32, roughness:.52, metalness:.08, transparent:true, opacity: memory ? .86 : .94 });
+    const replay = replayStateForNode(n);
+    const health = healthStateForNode(n);
+    let baseColor = memory ? colors.memory : colors.entity;
+    if(memory && health === 'stale') baseColor = 0x64748b;
+    if(memory && health === 'low-signal') baseColor = 0x475569;
+    if(memory && health === 'important') baseColor = 0xa7f3d0;
+    if(replay === 'included') baseColor = 0xffffff;
+    const mat = new THREE.MeshStandardMaterial({ color:baseColor, emissive:baseColor, emissiveIntensity: replay === 'included' ? .78 : (memory ? .18 : .32), roughness:.52, metalness:.08, transparent:true, opacity: memory ? (health === 'stale' ? .54 : .86) : .94 });
     const mesh = new THREE.Mesh(geom, mat);
     mesh.position.set(n.x, n.y, n.z);
     mesh.userData.node = n;
@@ -1101,10 +1126,16 @@ function addMemoryCity(THREE, group, nodes, edges, colors){
     const edge = new THREE.LineSegments(new THREE.EdgesGeometry(geom), new THREE.LineBasicMaterial({ color:0xffffff, transparent:true, opacity:memory ? .16 : .24 }));
     edge.position.copy(mesh.position);
     group.add(edge);
-    if((memory && (Number(n._weight || 0) > 4 || i % 9 === 0)) || !memory){
-      const light = new THREE.PointLight(baseColor, memory ? .25 : .42, memory ? 80 : 120);
+    if((memory && (Number(n._weight || 0) > 4 || i % 9 === 0 || replay === 'included')) || !memory){
+      const light = new THREE.PointLight(baseColor, replay === 'included' ? .9 : (memory ? .25 : .42), memory ? 92 : 120);
       light.position.set(n.x, n.cityHeight + 8, n.z);
       group.add(light);
+    }
+    if(memory && ['stale','low-signal','busy','important'].includes(health)){
+      const beaconColor = health === 'stale' ? 0xf97316 : (health === 'low-signal' ? 0x94a3b8 : (health === 'busy' ? 0x38bdf8 : 0x34d399));
+      const beacon = new THREE.Mesh(new THREE.SphereGeometry(3.6, 10, 10), new THREE.MeshBasicMaterial({ color: beaconColor, transparent:true, opacity:.92 }));
+      beacon.position.set(n.x, (n.cityHeight || 34) + 8, n.z);
+      group.add(beacon);
     }
   });
 }
@@ -1218,7 +1249,7 @@ function addPoints(THREE, scene, nodes, kind, color, size){
     phases[i]=(n.twinkle || 0) * Math.PI * 2;
     freqs[i]=n.twinkleFreq || .0012;
     amps[i]=n.twinkleAmp || .12;
-    majors[i]=weight > 6.2 || (kind === 'memory' && weight > 4.8) ? 1 : 0;
+    majors[i]=replayStateForNode(n) === 'included' || weight > 6.2 || (kind === 'memory' && weight > 4.8) ? 1 : 0;
   });
   const geometry = new THREE.BufferGeometry();
   geometry.setAttribute('position', new THREE.BufferAttribute(positions,3));
@@ -1375,7 +1406,8 @@ async function renderThreeVisualiser(data){
   for(let i=0;i<starCount;i++){ const r=600+((i*37)%480), a=i*2.17, b=((i*53)%180-90)*Math.PI/180; starPositions.set([Math.cos(a)*Math.cos(b)*r, Math.sin(b)*r, Math.sin(a)*Math.cos(b)*r], i*3); }
   const starGeom = new THREE.BufferGeometry(); starGeom.setAttribute('position', new THREE.BufferAttribute(starPositions,3));
   scene.add(new THREE.Points(starGeom, new THREE.PointsMaterial({ color:0xffffff, map:makePointTexture(THREE, 'orb'), alphaTest:.04, size:1.25, transparent:true, opacity:threeVis.mode === 'city' ? .16 : (threeVis.mode === 'neural' ? .38 : .24), depthWrite:false })));
-  const pulseEdges = threeVis.mode === 'neural' ? edges.slice(0, 90) : (threeVis.mode === 'city' ? edges.slice(0, 80) : []);
+  const replayEdges = threeVis.replayNodes?.size ? edges.filter(e => threeVis.replayEdges?.has(e.id) || threeVis.replayNodes.has(String(e.a.memory_id||'')) || threeVis.replayNodes.has(String(e.b.memory_id||''))) : [];
+  const pulseEdges = replayEdges.length ? replayEdges.slice(0, 110) : (threeVis.mode === 'neural' ? edges.slice(0, 90) : (threeVis.mode === 'city' ? edges.slice(0, 80) : []));
   const pulseGeom = new THREE.BufferGeometry(); const pulsePositions = new Float32Array(pulseEdges.length*3); pulseGeom.setAttribute('position', new THREE.BufferAttribute(pulsePositions,3));
   const pulsePoints = new THREE.Points(pulseGeom, new THREE.PointsMaterial({ color:colors.pulse, map:makePointTexture(THREE, 'star'), alphaTest:.03, size:threeVis.mode === 'city' ? 8.5 : (threeVis.mode === 'neural' ? 10.5 : 5.2), transparent:true, opacity:threeVis.mode === 'neural' ? (colors.light ? .54 : .98) : (threeVis.mode === 'city' ? .92 : .85), depthWrite:false, depthTest:false, blending:colors.light ? THREE.NormalBlending : THREE.AdditiveBlending })); group.add(pulsePoints);
   const labelNodes = nodes.filter(n => !/^[a-f0-9]{10,}$/i.test(String(n.label||''))).sort((a,b)=>(b._degree+b._weight)-(a._degree+a._weight)).slice(0, threeVis.mode === 'city' ? 42 : (threeVis.mode === 'neural' ? 72 : 56));
@@ -1472,6 +1504,25 @@ function animateThree(t=0){
   threeVis.renderer.render(threeVis.scene, threeVis.camera); updateThreeLabels();
   threeVis.frame = requestAnimationFrame(animateThree);
 }
+async function runVisualiserRecall(){
+  const input = $('#threeRecallQuery');
+  const query = String(input?.value || '').trim();
+  if(!query){ toast('Enter a recall query'); return; }
+  const btn = $('#threeRunRecall'); const old = btn?.textContent;
+  try{
+    if(btn){ btn.disabled = true; btn.textContent = 'Replaying…'; }
+    const data = await api('/api/recall',{method:'POST',body:JSON.stringify({query,top_k:12,namespace:ns(),include_consolidated:true,expand_entities:true})});
+    const results = data.results || data.items || [];
+    const rids = new Set(results.map(r => String(r.rid || r.memory_id || '').trim()).filter(Boolean));
+    const terms = new Set();
+    results.forEach(r => String([r.domain,r.source,...(r.why_retrieved||r.reasons||[])].join(' ')).toLowerCase().split(/[^a-z0-9_.:-]+/).filter(x=>x.length>3).slice(0,8).forEach(x=>terms.add(x)));
+    threeVis.replay = { query, results }; threeVis.replayNodes = rids; threeVis.replayEntities = terms; threeVis.replayEdges = new Set();
+    $('#threeReplayStatus').innerHTML = `<strong>Recall replay</strong><span>${esc(query)} · ${results.length} hit(s)</span>`;
+    if(threeVis.data) await renderThreeVisualiser(threeVis.data);
+  } catch(e){ toast(e.message); }
+  finally{ if(btn){ btn.disabled = false; btn.textContent = old || 'Replay recall'; } }
+}
+
 async function loadThreeVisualiser(){
   setVisualiserLoading(true, 'Building visualiser');
   try{

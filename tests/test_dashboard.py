@@ -77,6 +77,10 @@ def test_memory_city_visualiser_contract():
     assert "addMemoryCity" in js
     assert "District landmark" in js
     assert "Memory building" in js
+    assert "layout_district" in js
+    assert "healthStateForNode" in js
+    assert "threeRunRecall" in html
+    assert "runVisualiserRecall" in js
     assert 'data-three-mode=city' in css
 
 
@@ -260,6 +264,34 @@ def test_constellation_all_namespaces_balances_scope_sampling(tmp_path, monkeypa
     namespaces = {node["namespace"] for node in result["nodes"] if node.get("namespace")}
     assert {"ns:big", "ns:small"} <= namespaces
     assert any(edge.get("item", {}).get("namespace") == "ns:small" for edge in result["edges"])
+
+
+def test_constellation_payload_includes_layout_and_health_hints(tmp_path, monkeypatch):
+    db_path = tmp_path / "yantrikdb.db"
+    import sqlite3
+
+    with sqlite3.connect(db_path) as conn:
+        conn.execute("""
+            CREATE TABLE memories (
+                rid TEXT PRIMARY KEY, text TEXT, domain TEXT, source TEXT, type TEXT,
+                importance REAL, created_at REAL, updated_at REAL, access_count INTEGER,
+                consolidation_status TEXT, namespace TEXT
+            )
+        """)
+        conn.execute(
+            "INSERT INTO memories VALUES (?,?,?,?,?,?,?,?,?,?,?)",
+            ("rid-hot-0001", "Important YantrikDB dashboard memory", "work", "user", "semantic", .95, 10, 10, 9, "active", "ns:a"),
+        )
+
+    monkeypatch.setattr(dashboard, "DB_PATH", db_path)
+    result = dashboard.constellation(namespace="ns:a", limit=40)
+    memory_nodes = [node for node in result["nodes"] if node["kind"] == "memory"]
+    assert memory_nodes
+    node = memory_nodes[0]
+    assert node["layout_region"] == node["semantic_category"]
+    assert node["layout_district"] == node["semantic_category"]
+    assert node["health"]["state"] in {"busy", "important"}
+    assert "high-recall" in node["health"]["tags"]
 
 
 def test_index_has_memory_namespace_filter_and_maintenance_label():

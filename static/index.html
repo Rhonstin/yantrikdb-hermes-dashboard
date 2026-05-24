@@ -86,6 +86,10 @@
           <button id="threePanMode" class="btn secondary">Pan</button>
           <button id="threePause" class="btn secondary">Pause</button>
         </div>
+        <div class="visualiser-recall" aria-label="Recall replay controls">
+          <input id="threeRecallQuery" placeholder="Replay recall through the visualiser…" />
+          <button id="threeRunRecall" class="btn primary">Replay recall</button>
+        </div>
         <span id="threeHelp" class="muted">Drag to rotate · Right-click/Shift+drag to pan · Wheel/pinch to zoom.</span>
       </div>
       <div class="three-layout">
@@ -99,6 +103,7 @@
             <em>Preparing the selected memory scope…</em>
           </div>
           <div id="threeLegend" class="constellation-legend three-legend"><span><i class="legend-dot entity"></i>Entity/topic</span><span><i class="legend-dot memory"></i>Memory</span><span><i class="legend-line"></i>Link</span></div>
+          <div id="threeReplayStatus" class="three-replay-status"><strong>Recall replay</strong><span>Run a query to light up recalled memories across this view.</span></div>
           <aside id="threeFullscreenInspector" class="three-fullscreen-inspector" aria-live="polite" aria-label="Fullscreen selection details"></aside>
         </div>
         <aside id="threeInspector" class="graph-inspector glass">

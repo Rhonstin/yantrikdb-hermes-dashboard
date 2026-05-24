@@ -1094,6 +1094,32 @@ def _entity_terms(text: str, limit: int = 4) -> list[str]:
     return terms
 
 
+def _memory_health(m: dict[str, Any]) -> dict[str, Any]:
+    """Small read-only visual health hints for Memory City overlays."""
+    importance = float(m.get("importance") or 0.0)
+    access_count = int(m.get("access_count") or 0)
+    status = str(m.get("consolidation_status") or "active")
+    last_seen = float(m.get("last_access") or m.get("updated_at") or m.get("created_at") or 0)
+    age_days = max(0.0, (now() - last_seen) / 86400) if last_seen else None
+    tags: list[str] = []
+    state = "steady"
+    if status == "consolidated":
+        tags.append("consolidated")
+    if access_count >= 5:
+        tags.append("high-recall")
+        state = "busy"
+    if age_days is not None and age_days > 120:
+        tags.append("stale")
+        state = "stale" if state == "steady" else state
+    if importance < 0.35:
+        tags.append("low-signal")
+        state = "low-signal" if state == "steady" else state
+    if importance >= 0.8:
+        tags.append("important")
+        state = "important" if state == "steady" else state
+    return {"state": state, "tags": tags, "access_count": access_count, "age_days": round(age_days, 1) if age_days is not None else None}
+
+
 @app.get("/api/constellation")
 def constellation(namespace: str = Query(DEFAULT_NAMESPACE), limit: int = Query(240, ge=40, le=600)) -> dict[str, Any]:
     """Mnemosyne-style visualiser payload derived from YantrikDB memories.
@@ -1192,12 +1218,20 @@ def constellation(namespace: str = Query(DEFAULT_NAMESPACE), limit: int = Query(
         rid = str(m.get("rid") or "")
         scope = str(m.get("namespace") or namespace or DEFAULT_NAMESPACE)
         semantic_category = _category_for_text(" ".join([text, str(m.get("domain") or ""), str(m.get("source") or "")]))
-        graph_category = scope_label(scope) if all_scope else semantic_category
+        scope_name = scope_label(scope)
+        graph_category = scope_name if all_scope else semantic_category
+        layout_region = scope_name if all_scope else semantic_category
+        layout_district = f"{scope_name} / {semantic_category}" if all_scope else semantic_category
         importance = float(m.get("importance") or 0.35)
         m_node = touch(f"memory:{rid[:8]}…{rid[-6:]}", kind="memory", weight=importance * 1.8, category=graph_category, rid=rid, preview=text, scope=scope, semantic_category=semantic_category)
+        m_node["layout_region"] = layout_region
+        m_node["layout_district"] = layout_district
+        m_node["health"] = _memory_health(m)
         seeds = [m.get("domain"), m.get("source"), *_entity_terms(text, limit=4)]
         if all_scope:
-            scope_node = touch(scope_label(scope), kind="namespace", weight=max(0.35, importance * 1.2), category=graph_category, scope=scope, semantic_category="Namespace")
+            scope_node = touch(scope_name, kind="namespace", weight=max(0.35, importance * 1.2), category=graph_category, scope=scope, semantic_category="Namespace")
+            scope_node["layout_region"] = scope_name
+            scope_node["layout_district"] = f"{scope_name} / Scope hub"
             edges.append({"id": f"e{len(edges)+1}", "source": scope_node["id"], "target": m_node["id"], "label": "contains", "kind": "scope", "item": {"rid": rid, "namespace": scope}})
         seen: set[str] = set()
         for raw in seeds:
@@ -1206,6 +1240,8 @@ def constellation(namespace: str = Query(DEFAULT_NAMESPACE), limit: int = Query(
                 continue
             seen.add(entity.lower())
             e_node = touch(entity, kind="entity", weight=max(0.25, importance), category=graph_category, scope=scope, semantic_category=semantic_category)
+            e_node["layout_region"] = layout_region
+            e_node["layout_district"] = layout_district
             edges.append({"id": f"e{len(edges)+1}", "source": m_node["id"], "target": e_node["id"], "label": "mentions", "kind": "memory", "item": {"rid": rid, "entity": entity, "namespace": scope}})
 
     ranked_nodes = sorted(nodes_by_key.values(), key=lambda n: (float(n.get("weight") or 0), int(n.get("count") or 0)), reverse=True)
