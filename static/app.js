@@ -886,6 +886,42 @@ function replayStateForNode(n){
   return null;
 }
 function healthStateForNode(n){ return n?.health?.state || 'steady'; }
+function resultRid(r){ return String(r?.rid || r?.memory_id || r?.id || '').trim(); }
+function resultText(r){ return String(r?.text || r?.preview || r?.content || '').replace(/\s+/g,' ').trim(); }
+function buildRecallOverlayData(data, results=[]){
+  if(!results.length) return data;
+  const copy = {...data};
+  const baseNodes = (data.nodes || []).map(n => ({...n}));
+  const baseEdges = (data.edges || []).map(e => ({...e}));
+  const byRid = new Map(baseNodes.filter(n => n.memory_id).map(n => [String(n.memory_id), n]));
+  const hubId = 'replay:hub';
+  const hub = { id:hubId, label:'Recall replay', kind:'entity', category:'Recall replay', semantic_category:'Recall replay', layout_region:'Recall replay', layout_district:'Recall replay', weight:9, count:results.length, replay_hub:true };
+  const overlayNodes = [hub];
+  const overlayEdges = [];
+  const added = new Set();
+  results.forEach((r,i) => {
+    const rid = resultRid(r); if(!rid || added.has(rid)) return; added.add(rid);
+    const existing = byRid.get(rid);
+    if(existing){ existing.replay_boost = true; existing.layout_region = existing.layout_region || 'Recall replay'; existing.layout_district = existing.layout_district || existing.layout_region || 'Recall replay'; overlayEdges.push({ id:`replay-edge:${rid}`, source:hubId, target:existing.id, label:'recalled', kind:'replay', item:{rid, namespace:existing.namespace || r.namespace} }); return; }
+    const text = resultText(r);
+    const domain = String(r.domain || 'Recall replay');
+    const node = {
+      id:`replay:${rid}`, label:`memory:${rid.slice(0,8)}`, kind:'memory', category:'Recall replay', semantic_category:domain,
+      layout_region:'Recall replay', layout_district:`Recall replay / ${domain}`, namespace:r.namespace || ns(), scope_label:r.namespace || ns(),
+      weight:Math.max(7.5, Number(r.importance || r.score || .7) * 10), count:1, memory_id:rid, preview:text || `Recall result ${i+1}`,
+      health:{state:'recalled', tags:['recalled','injected'], access_count:Number(r.access_count || 0), age_days:null}, replay_boost:true
+    };
+    overlayNodes.push(node);
+    overlayEdges.push({ id:`replay-edge:${rid}`, source:hubId, target:node.id, label:'recalled', kind:'replay', item:{rid, namespace:r.namespace || ns()} });
+  });
+  const recalled = new Set(results.map(resultRid).filter(Boolean));
+  const sortedBase = baseNodes.sort((a,b)=>(recalled.has(String(b.memory_id||''))?1:0)-(recalled.has(String(a.memory_id||''))?1:0));
+  copy.nodes = [...overlayNodes, ...sortedBase];
+  copy.edges = [...overlayEdges, ...baseEdges];
+  copy.clusters = [{label:'Recall replay', count:results.length}, ...(data.clusters || [])];
+  copy.replay_overlay = true;
+  return copy;
+}
 
 function makePointTexture(THREE, kind){
   const canvas = document.createElement('canvas');
@@ -1117,6 +1153,7 @@ function addMemoryCity(THREE, group, nodes, edges, colors){
     if(memory && health === 'stale') baseColor = 0x64748b;
     if(memory && health === 'low-signal') baseColor = 0x475569;
     if(memory && health === 'important') baseColor = 0xa7f3d0;
+    if(memory && health === 'recalled') baseColor = 0xffffff;
     if(replay === 'included') baseColor = 0xffffff;
     const mat = new THREE.MeshStandardMaterial({ color:baseColor, emissive:baseColor, emissiveIntensity: replay === 'included' ? .78 : (memory ? .18 : .32), roughness:.52, metalness:.08, transparent:true, opacity: memory ? (health === 'stale' ? .54 : .86) : .94 });
     const mesh = new THREE.Mesh(geom, mat);
@@ -1131,7 +1168,7 @@ function addMemoryCity(THREE, group, nodes, edges, colors){
       light.position.set(n.x, n.cityHeight + 8, n.z);
       group.add(light);
     }
-    if(memory && ['stale','low-signal','busy','important'].includes(health)){
+    if(memory && ['stale','low-signal','busy','important','recalled'].includes(health)){
       const beaconColor = health === 'stale' ? 0xf97316 : (health === 'low-signal' ? 0x94a3b8 : (health === 'busy' ? 0x38bdf8 : 0x34d399));
       const beacon = new THREE.Mesh(new THREE.SphereGeometry(3.6, 10, 10), new THREE.MeshBasicMaterial({ color: beaconColor, transparent:true, opacity:.92 }));
       beacon.position.set(n.x, (n.cityHeight || 34) + 8, n.z);
@@ -1243,13 +1280,14 @@ function addPoints(THREE, scene, nodes, kind, color, size){
   selected.forEach((n,i)=>{
     const weight = Math.max(1, Number(n.weight || n.count || 1));
     positions[i*3]=n.x; positions[i*3+1]=n.y; positions[i*3+2]=n.z;
+    const replay = replayStateForNode(n);
     const degreeBoost = Math.min(10, Number(n._degree || 0) * 1.9);
     const variedSize = (n.size || size) + degreeBoost;
-    sizes[i]=Math.max(size * 1.14, Math.min(size * 2.65, variedSize * 1.62));
+    sizes[i]=replay === 'included' ? Math.max(size * 2.8, Math.min(size * 4.4, variedSize * 3.4)) : Math.max(size * 1.14, Math.min(size * 2.65, variedSize * 1.62));
     phases[i]=(n.twinkle || 0) * Math.PI * 2;
-    freqs[i]=n.twinkleFreq || .0012;
-    amps[i]=n.twinkleAmp || .12;
-    majors[i]=replayStateForNode(n) === 'included' || weight > 6.2 || (kind === 'memory' && weight > 4.8) ? 1 : 0;
+    freqs[i]=replay === 'included' ? .012 : (n.twinkleFreq || .0012);
+    amps[i]=replay === 'included' ? .62 : (n.twinkleAmp || .12);
+    majors[i]=replay === 'included' || weight > 6.2 || (kind === 'memory' && weight > 4.8) ? 1 : 0;
   });
   const geometry = new THREE.BufferGeometry();
   geometry.setAttribute('position', new THREE.BufferAttribute(positions,3));
@@ -1513,12 +1551,12 @@ async function runVisualiserRecall(){
     if(btn){ btn.disabled = true; btn.textContent = 'Replaying…'; }
     const data = await api('/api/recall',{method:'POST',body:JSON.stringify({query,top_k:12,namespace:ns(),include_consolidated:true,expand_entities:true})});
     const results = data.results || data.items || [];
-    const rids = new Set(results.map(r => String(r.rid || r.memory_id || '').trim()).filter(Boolean));
+    const rids = new Set(results.map(resultRid).filter(Boolean));
     const terms = new Set();
     results.forEach(r => String([r.domain,r.source,...(r.why_retrieved||r.reasons||[])].join(' ')).toLowerCase().split(/[^a-z0-9_.:-]+/).filter(x=>x.length>3).slice(0,8).forEach(x=>terms.add(x)));
     threeVis.replay = { query, results }; threeVis.replayNodes = rids; threeVis.replayEntities = terms; threeVis.replayEdges = new Set();
-    $('#threeReplayStatus').innerHTML = `<strong>Recall replay</strong><span>${esc(query)} · ${results.length} hit(s)</span>`;
-    if(threeVis.data) await renderThreeVisualiser(threeVis.data);
+    $('#threeReplayStatus').innerHTML = `<strong>Recall replay</strong><span>${esc(query)} · ${results.length} hit(s), injected into view</span>`;
+    if(threeVis.data) await renderThreeVisualiser(buildRecallOverlayData(threeVis.data, results));
   } catch(e){ toast(e.message); }
   finally{ if(btn){ btn.disabled = false; btn.textContent = old || 'Replay recall'; } }
 }
