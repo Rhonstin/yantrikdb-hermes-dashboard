@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>YantrikDB for Hermes</title>
   <link rel="icon" href="/static/assets/favicon.svg?v=yantrikdb-white-favicon-2" type="image/svg+xml">
-  <link rel="stylesheet" href="/static/styles.css?v=memory-city-xray-legend-50" />
+  <link rel="stylesheet" href="/static/styles.css?v=recall-panel-51" />
 </head>
 <body>
   <div class="grain"></div>
@@ -86,11 +86,18 @@
           <button id="threePanMode" class="btn secondary">Pan</button>
           <button id="threePause" class="btn secondary">Pause</button>
         </div>
-        <div class="visualiser-recall" aria-label="Recall replay controls">
+        <span id="threeHelp" class="muted">Drag to rotate · Right-click/Shift+drag to pan · Wheel/pinch to zoom.</span>
+      </div>
+      <div class="visualiser-recall-card" aria-label="Recall replay controls">
+        <div class="visualiser-recall-copy">
+          <span class="pill good">Recall replay</span>
+          <p>Search memory, inject the hits into this visualiser, and light up the path without resetting your view.</p>
+        </div>
+        <div class="visualiser-recall">
           <input id="threeRecallQuery" placeholder="Replay recall through the visualiser…" />
           <button id="threeRunRecall" class="btn primary">Replay recall</button>
         </div>
-        <span id="threeHelp" class="muted">Drag to rotate · Right-click/Shift+drag to pan · Wheel/pinch to zoom.</span>
+        <div id="threeReplayStatus" class="visualiser-recall-status"><strong>Ready</strong><span>Run a query to light up recalled memories across this view.</span></div>
       </div>
       <div class="three-layout">
         <div id="threeViewport" class="three-viewport glass" aria-label="Interactive 3D YantrikDB memory visualiser">
@@ -103,7 +110,6 @@
             <em>Preparing the selected memory scope…</em>
           </div>
           <div id="threeLegend" class="constellation-legend three-legend"><span><i class="legend-dot entity"></i>Entity/topic</span><span><i class="legend-dot memory"></i>Memory</span><span><i class="legend-line"></i>Link</span></div>
-          <div id="threeReplayStatus" class="three-replay-status"><strong>Recall replay</strong><span>Run a query to light up recalled memories across this view.</span></div>
           <aside id="threeFullscreenInspector" class="three-fullscreen-inspector" aria-live="polite" aria-label="Fullscreen selection details"></aside>
         </div>
         <aside id="threeInspector" class="graph-inspector glass">
@@ -392,6 +398,6 @@
       <div class="modal-actions"><button id="confirmCancel" class="btn secondary">Cancel</button><button id="confirmOk" class="btn primary">Continue</button></div>
     </div>
   </div>
-  <script src="/static/app.js?v=memory-city-xray-legend-50"></script>
+  <script src="/static/app.js?v=recall-panel-51"></script>
 </body>
 </html>

@@ -334,8 +334,14 @@
 
   .visualiser-toolbar { @apply mb-4; }
   .visualiser-actions { @apply flex min-w-0 flex-wrap items-center gap-2; }
-  .visualiser-recall { @apply grid min-w-0 flex-1 grid-cols-1 gap-2 sm:grid-cols-[minmax(220px,1fr)_auto]; }
+  .visualiser-recall-card { @apply mb-4 grid gap-3 rounded-3xl border border-[rgba(52,211,153,.18)] bg-[rgba(5,18,14,.48)] p-4 shadow-panel backdrop-blur-xl lg:grid-cols-[minmax(190px,.8fr)_minmax(260px,1.25fr)_minmax(180px,.8fr)] lg:items-center; }
+  .visualiser-recall-copy { @apply min-w-0; }
+  .visualiser-recall-copy p { @apply mt-2 max-w-[58ch] text-sm leading-6 text-zinc-400; }
+  .visualiser-recall { @apply grid min-w-0 grid-cols-1 gap-2 sm:grid-cols-[minmax(220px,1fr)_auto]; }
   .visualiser-recall input { @apply min-h-10 rounded-xl border border-white/10 bg-[var(--surface-30)] px-3 py-2 text-sm; }
+  .visualiser-recall-status { @apply min-w-0 rounded-2xl border border-white/10 bg-white/[.045] px-3 py-2 text-xs leading-5 text-zinc-300; }
+  .visualiser-recall-status strong { @apply mr-2 font-bold text-[rgb(167,243,208)]; }
+  .visualiser-recall-status span { @apply text-zinc-300; }
   .visualiser-toolbar .muted { @apply min-w-0 text-sm leading-6; }
   .cluster-row { @apply mb-3 flex flex-wrap gap-2; }
   .cluster-pill { @apply rounded-full border border-white/10 bg-white/[.05] px-3 py-1.5 text-xs font-bold text-zinc-300; }
