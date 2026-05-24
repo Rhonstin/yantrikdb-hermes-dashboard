@@ -755,7 +755,7 @@ let threeModulePromise = null;
 let threeVis = {
   mode: 'constellation', data: null, renderer: null, scene: null, camera: null, group: null,
   nodes: [], edgePairs: [], labels: [], pulses: [], frame: 0, paused: false, panMode: false,
-  drag: null, pointer: new Map(), yaw: 0, pitch: 0.32, cameraZ: 780, panX: 0, panY: 0, lastT: 0,
+  drag: null, pointer: new Map(), yaw: 0, pitch: 0.32, cameraZ: 780, panX: 0, panY: 0, lastT: 0, lastRenderT: 0,
   selectedNode: null, replay: null, replayNodes: new Set(), replayEdges: new Set()
 };
 function loadThreeModule(){
@@ -841,7 +841,7 @@ function updateThreeUI(){
   const pause = $('#threePause'); if(pause) pause.textContent = threeVis.paused ? (compact ? 'Resume' : (threeVis.mode === 'neural' ? 'Resume drift' : (threeVis.mode === 'city' ? 'Resume traffic' : 'Resume rotation'))) : (compact ? 'Pause' : (threeVis.mode === 'neural' ? 'Pause drift' : (threeVis.mode === 'city' ? 'Pause traffic' : 'Pause rotation')));
   const pan = $('#threePanMode'); if(pan) pan.textContent = threeVis.panMode ? (compact ? 'Orbit' : 'Orbit mode') : (compact ? 'Pan' : 'Pan mode');
 }
-function resetThreeCamera(){ Object.assign(threeVis, { yaw: threeVis.mode === 'neural' ? .12 : (threeVis.mode === 'city' ? .62 : .70), pitch: threeVis.mode === 'neural' ? .10 : (threeVis.mode === 'city' ? .72 : .96), cameraZ: threeVis.mode === 'neural' ? 600 : (threeVis.mode === 'city' ? 1180 : 760), panX:0, panY: threeVis.mode === 'neural' ? -10 : (threeVis.mode === 'city' ? -24 : -84), lastT:0 }); }
+function resetThreeCamera(){ Object.assign(threeVis, { yaw: threeVis.mode === 'neural' ? .12 : (threeVis.mode === 'city' ? .62 : .70), pitch: threeVis.mode === 'neural' ? .10 : (threeVis.mode === 'city' ? .72 : .96), cameraZ: threeVis.mode === 'neural' ? 600 : (threeVis.mode === 'city' ? 1180 : 760), panX:0, panY: threeVis.mode === 'neural' ? -10 : (threeVis.mode === 'city' ? -24 : -84), lastT:0, lastRenderT:0 }); }
 function clearThreeScene(){
   if(threeVis.frame) cancelAnimationFrame(threeVis.frame);
   threeVis.frame = 0;
@@ -870,6 +870,10 @@ function threeRenderPixelRatio(viewport){
   const base = Math.max(1, window.devicePixelRatio || 1);
   const fullscreen = document.fullscreenElement === viewport || viewport?.matches?.(':fullscreen');
   const mobile = rect.width < 520;
+  if(threeVis.mode === 'city'){
+    const cityCap = fullscreen ? 1.8 : (mobile ? 1.35 : 1.45);
+    return Math.max(1, Math.min(base, cityCap));
+  }
   const qualityBoost = fullscreen ? 1.45 : 1.35;
   const cap = fullscreen ? 3.5 : (mobile ? 2.75 : 3.25);
   const maxPixels = fullscreen ? 12000000 : (mobile ? 3000000 : 6500000);
@@ -1129,28 +1133,60 @@ function buildThreeCityPositions(data){
 }
 function addMemoryCity(THREE, group, nodes, edges, colors, xray=false){
   const districtGeom = new THREE.PlaneGeometry(172, 172, 1, 1);
+  const districtMats = [
+    new THREE.MeshBasicMaterial({ color:0x11121b, transparent:true, opacity:xray ? .28 : .62, side:THREE.DoubleSide, depthWrite:false }),
+    new THREE.MeshBasicMaterial({ color:0x101827, transparent:true, opacity:xray ? .28 : .62, side:THREE.DoubleSide, depthWrite:false })
+  ];
+  const districtRingMat = new THREE.LineBasicMaterial({ color:colors.link, transparent:true, opacity:xray ? .22 : .18, depthWrite:false });
+  const districtEdgeGeom = new THREE.EdgesGeometry(districtGeom);
   (threeVis.cityDistricts || []).forEach((d, i) => {
-    const mat = new THREE.MeshBasicMaterial({ color: i % 2 ? 0x101827 : 0x11121b, transparent:true, opacity:xray ? .36 : .78, side:THREE.DoubleSide, depthWrite:false });
-    const plane = new THREE.Mesh(districtGeom, mat);
+    const plane = new THREE.Mesh(districtGeom, districtMats[i % 2]);
     plane.rotation.x = -Math.PI / 2;
     plane.position.set(d.cx, -1.2, d.cz);
     group.add(plane);
-    const ring = new THREE.LineSegments(new THREE.EdgesGeometry(districtGeom), new THREE.LineBasicMaterial({ color:colors.link, transparent:true, opacity:.28 }));
+    const ring = new THREE.LineSegments(districtEdgeGeom, districtRingMat);
     ring.rotation.x = -Math.PI / 2;
     ring.position.copy(plane.position);
     group.add(ring);
   });
   const roadPositions=[];
-  edges.forEach(e => {
-    roadPositions.push(e.a.x, 1.2, e.a.z, e.b.x, 1.2, e.b.z);
-  });
+  edges.forEach(e => { roadPositions.push(e.a.x, 1.2, e.a.z, e.b.x, 1.2, e.b.z); });
   if(roadPositions.length){
     const roadGeom = new THREE.BufferGeometry(); roadGeom.setAttribute('position', new THREE.BufferAttribute(new Float32Array(roadPositions),3));
-    group.add(new THREE.LineSegments(roadGeom, new THREE.LineBasicMaterial({ color:colors.link, transparent:true, opacity:xray ? .34 : .20, depthWrite:false })));
+    group.add(new THREE.LineSegments(roadGeom, new THREE.LineBasicMaterial({ color:colors.link, transparent:true, opacity:xray ? .28 : .14, depthWrite:false })));
   }
+  const boxGeom = new THREE.BoxGeometry(1, 1, 1);
+  const sphereGeom = new THREE.SphereGeometry(3.6, 8, 8);
+  const mats = new Map();
+  const wireMats = new Map();
+  const beaconMats = new Map();
+  const matrix = new THREE.Matrix4();
+  const quat = new THREE.Quaternion();
+  const materialFor = (key, color, opacity) => {
+    const id = `${key}:${color}:${opacity.toFixed(2)}`;
+    if(!mats.has(id)) mats.set(id, new THREE.MeshBasicMaterial({ color, transparent:true, opacity, depthWrite:!xray }));
+    return mats.get(id);
+  };
+  const wireMatFor = (key, opacity) => {
+    const id = `${key}:${opacity.toFixed(2)}`;
+    if(!wireMats.has(id)) wireMats.set(id, new THREE.MeshBasicMaterial({ color:0xffffff, transparent:true, opacity, wireframe:true, depthWrite:false }));
+    return wireMats.get(id);
+  };
+  const beaconMatFor = color => {
+    if(!beaconMats.has(color)) beaconMats.set(color, new THREE.MeshBasicMaterial({ color, transparent:true, opacity:.88, depthWrite:false }));
+    return beaconMats.get(color);
+  };
+  const pushBucket = (map, material, node) => {
+    const key = material.uuid;
+    if(!map.has(key)) map.set(key, { material, nodes:[] });
+    map.get(key).nodes.push(node);
+  };
+  const buildingBuckets = new Map();
+  const wireBuckets = new Map();
+  const outlineLimit = xray ? 72 : 54;
+  let outlines = 0;
   nodes.forEach((n,i) => {
     const memory = n.kind === 'memory';
-    const geom = new THREE.BoxGeometry(n.cityWidth || 18, n.cityHeight || 34, n.cityDepth || 18);
     const replay = replayStateForNode(n);
     const health = healthStateForNode(n);
     let baseColor = memory ? colors.memory : colors.entity;
@@ -1159,27 +1195,37 @@ function addMemoryCity(THREE, group, nodes, edges, colors, xray=false){
     if(memory && health === 'important') baseColor = 0xa7f3d0;
     if(memory && health === 'recalled') baseColor = 0xffffff;
     if(replay === 'included') baseColor = 0xffffff;
-    const cityOpacity = memory ? (health === 'stale' ? (xray ? .22 : .54) : (xray ? .38 : .86)) : (xray ? .32 : .94);
-    const mat = new THREE.MeshStandardMaterial({ color:baseColor, emissive:baseColor, emissiveIntensity: replay === 'included' ? .78 : (memory ? (xray ? .30 : .18) : (xray ? .46 : .32)), roughness:.52, metalness:xray ? .18 : .08, transparent:true, opacity:cityOpacity, depthWrite:!xray });
-    const mesh = new THREE.Mesh(geom, mat);
-    mesh.position.set(n.x, n.y, n.z);
-    mesh.userData.node = n;
-    group.add(mesh);
-    const edge = new THREE.LineSegments(new THREE.EdgesGeometry(geom), new THREE.LineBasicMaterial({ color:0xffffff, transparent:true, opacity:xray ? (memory ? .40 : .52) : (memory ? .16 : .24) }));
-    edge.position.copy(mesh.position);
-    group.add(edge);
-    if((memory && (Number(n._weight || 0) > 4 || i % 9 === 0 || replay === 'included')) || !memory){
-      const light = new THREE.PointLight(baseColor, replay === 'included' ? .9 : (memory ? .25 : .42), memory ? 92 : 120);
-      light.position.set(n.x, n.cityHeight + 8, n.z);
-      group.add(light);
+    const cityOpacity = memory ? (health === 'stale' ? (xray ? .20 : .48) : (xray ? .34 : .78)) : (xray ? .30 : .88);
+    pushBucket(buildingBuckets, materialFor(`${memory?'mem':'entity'}:${health}:${replay||''}`, baseColor, cityOpacity), n);
+    const important = replay === 'included' || !memory || Number(n._weight || 0) > 4.6 || health !== 'steady';
+    if(important && outlines < outlineLimit){
+      outlines++;
+      pushBucket(wireBuckets, wireMatFor(memory ? 'memory' : 'entity', xray ? (memory ? .36 : .46) : (memory ? .13 : .20)), n);
     }
     if(memory && ['stale','low-signal','busy','important','recalled'].includes(health)){
       const beaconColor = health === 'stale' ? 0xf97316 : (health === 'low-signal' ? 0x94a3b8 : (health === 'busy' ? 0x38bdf8 : 0x34d399));
-      const beacon = new THREE.Mesh(new THREE.SphereGeometry(3.6, 10, 10), new THREE.MeshBasicMaterial({ color: beaconColor, transparent:true, opacity:.92 }));
+      const beacon = new THREE.Mesh(sphereGeom, beaconMatFor(beaconColor));
       beacon.position.set(n.x, (n.cityHeight || 34) + 8, n.z);
       group.add(beacon);
     }
   });
+  const addInstancedBoxes = (bucketMap) => {
+    bucketMap.forEach(({material, nodes:bucketNodes}) => {
+      const instanced = new THREE.InstancedMesh(boxGeom, material, bucketNodes.length);
+      bucketNodes.forEach((n, idx) => {
+        matrix.compose(
+          new THREE.Vector3(n.x, n.y, n.z),
+          quat,
+          new THREE.Vector3(n.cityWidth || 18, n.cityHeight || 34, n.cityDepth || 18)
+        );
+        instanced.setMatrixAt(idx, matrix);
+      });
+      instanced.instanceMatrix.needsUpdate = true;
+      group.add(instanced);
+    });
+  };
+  addInstancedBoxes(buildingBuckets);
+  addInstancedBoxes(wireBuckets);
 }
 function limitedThreeEdges(data, byId, mobile=false){
   const degree = new Map(); const out=[];
@@ -1575,8 +1621,14 @@ function updateThreeLabels(){
 }
 function animateThree(t=0){
   if(!threeVis.renderer) return;
-  resizeThree();
   const delta = threeVis.lastT ? Math.min(48, t - threeVis.lastT) : 16; threeVis.lastT = t;
+  const cityFrameMs = 1000 / (threeVis.drag ? 30 : 20);
+  if(threeVis.mode === 'city' && threeVis.lastRenderT && t - threeVis.lastRenderT < cityFrameMs){
+    threeVis.frame = requestAnimationFrame(animateThree);
+    return;
+  }
+  threeVis.lastRenderT = t;
+  resizeThree();
   if(!threeVis.paused && !threeVis.drag) threeVis.yaw += delta * (threeVis.mode === 'neural' ? .00009 : (threeVis.mode === 'city' ? .000035 : .000055));
   clampThreeCamera();
   threeVis.group.rotation.y = threeVis.yaw; threeVis.group.rotation.x = threeVis.pitch;

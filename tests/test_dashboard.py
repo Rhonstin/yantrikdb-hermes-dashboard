@@ -91,6 +91,13 @@ def test_memory_city_visualiser_contract():
     assert "X-ray district" in js
     assert "dataset.cityStyle" in js
     assert "bottomPad" in js
+    assert "new THREE.MeshStandardMaterial" not in js
+    assert "new THREE.PointLight(baseColor" not in js
+    assert "new THREE.InstancedMesh(boxGeom" in js
+    assert "wireframe:true" in js
+    assert "outlineLimit = xray ? 72 : 54" in js
+    assert "cityFrameMs = 1000 / (threeVis.drag ? 30 : 20)" in js
+    assert "cityCap = fullscreen ? 1.8 : (mobile ? 1.35 : 1.45)" in js
     assert 'data-three-mode=city' in css
 
 
