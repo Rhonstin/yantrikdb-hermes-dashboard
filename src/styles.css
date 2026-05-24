@@ -494,6 +494,8 @@
   .drawer-action { @apply w-full; }
   .constellation-wrap, .three-viewport { @apply h-[430px] min-h-[430px] rounded-3xl; }
   .constellation-legend, .three-legend { @apply left-3 right-3 bottom-3; }
+  .three-replay-status { @apply left-3 right-[4.75rem] top-3 bottom-auto max-w-none rounded-2xl px-3 py-2; }
+  .three-replay-status strong, .three-replay-status span { @apply block; }
   .three-label { max-width: 120px; }
 }
 
