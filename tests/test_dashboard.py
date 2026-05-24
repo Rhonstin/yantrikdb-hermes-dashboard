@@ -99,6 +99,9 @@ def test_memory_city_visualiser_contract():
     assert "cityFrameMs = 1000 / (threeVis.drag ? 30 : 20)" in js
     assert "cityCap = fullscreen ? 1.8 : (mobile ? 1.35 : 1.45)" in js
     assert 'data-three-mode=city' in css
+    init_py = (Path(__file__).resolve().parent.parent / "__init__.py").read_text()
+    assert "def register(ctx)" in init_py
+    assert "intentionally no-op" in init_py
 
 
 def test_password_gate_login_and_cookie_rotation(tmp_path, monkeypatch):
