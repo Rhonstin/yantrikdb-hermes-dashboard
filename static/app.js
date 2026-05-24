@@ -1244,6 +1244,43 @@ function addHaloPoints(THREE, scene, nodes, kind, color, size){
   const material = new THREE.PointsMaterial({ color, map:makePointTexture(THREE, 'orb'), alphaTest:.015, size, sizeAttenuation:true, transparent:true, opacity, depthWrite:false, blending:themeColors.light ? THREE.NormalBlending : THREE.AdditiveBlending });
   const points = new THREE.Points(geometry, material); scene.add(points); return points;
 }
+function addReplayBeacons(THREE, group, nodes, colors){
+  const recalled = nodes.filter(n => replayStateForNode(n) === 'included').slice(0, 18);
+  if(!recalled.length) return;
+  if(threeVis.mode === 'city'){
+    recalled.forEach((n,i) => {
+      const h = Math.max(72, (n.cityHeight || 34) + 64);
+      const beam = new THREE.Mesh(
+        new THREE.CylinderGeometry(7.5, 13, h, 18, 1, true),
+        new THREE.MeshBasicMaterial({ color:0x67e8f9, transparent:true, opacity:.30, depthWrite:false, blending:colors.light ? THREE.NormalBlending : THREE.AdditiveBlending, side:THREE.DoubleSide })
+      );
+      beam.position.set(n.x, h / 2, n.z);
+      group.add(beam);
+      const ring = new THREE.Mesh(
+        new THREE.TorusGeometry(Math.max(18, (n.cityWidth || 18) * 1.25), 2.8, 8, 36),
+        new THREE.MeshBasicMaterial({ color:0xffffff, transparent:true, opacity:.84, depthWrite:false, blending:colors.light ? THREE.NormalBlending : THREE.AdditiveBlending })
+      );
+      ring.rotation.x = Math.PI / 2;
+      ring.position.set(n.x, 3 + (i % 3) * .8, n.z);
+      group.add(ring);
+      const crown = new THREE.Mesh(new THREE.SphereGeometry(7.5, 18, 18), new THREE.MeshBasicMaterial({ color:0xffffff, transparent:true, opacity:.96, depthWrite:false }));
+      crown.position.set(n.x, (n.cityHeight || 34) + 16, n.z);
+      group.add(crown);
+    });
+    return;
+  }
+  const positions = new Float32Array(recalled.length * 3);
+  recalled.forEach((n,i)=>{ positions[i*3]=n.x; positions[i*3+1]=n.y; positions[i*3+2]=n.z; });
+  const geom = new THREE.BufferGeometry(); geom.setAttribute('position', new THREE.BufferAttribute(positions,3));
+  const marker = new THREE.Points(geom, new THREE.PointsMaterial({ color:0xffffff, map:makePointTexture(THREE, 'star'), alphaTest:.02, size:threeVis.mode === 'neural' ? 82 : 96, sizeAttenuation:true, transparent:true, opacity:.96, depthWrite:false, depthTest:false, blending:colors.light ? THREE.NormalBlending : THREE.AdditiveBlending }));
+  marker.renderOrder = 50;
+  group.add(marker);
+  recalled.slice(0,8).forEach(n => {
+    const light = new THREE.PointLight(0x67e8f9, threeVis.mode === 'neural' ? 1.5 : 1.2, 180);
+    light.position.set(n.x, n.y, n.z);
+    group.add(light);
+  });
+}
 function addNeuralDendrites(THREE, group, nodes, colors){
   const trunks=[]; const twigs=[]; const tips=[];
   nodes.slice(0,150).forEach((n,i)=>{
@@ -1441,6 +1478,7 @@ async function renderThreeVisualiser(data){
     group.add(addPoints(THREE, group, nodes, 'entity', colors.entity, threeVis.mode === 'neural' ? 30 : 52));
     group.add(addPoints(THREE, group, nodes, 'memory', colors.memory, threeVis.mode === 'neural' ? 26 : 50));
   }
+  addReplayBeacons(THREE, group, nodes, colors);
   const starCount = threeVis.mode === 'city' ? 180 : (threeVis.mode === 'neural' ? 360 : 420);
   const starPositions = new Float32Array(starCount*3);
   for(let i=0;i<starCount;i++){ const r=600+((i*37)%480), a=i*2.17, b=((i*53)%180-90)*Math.PI/180; starPositions.set([Math.cos(a)*Math.cos(b)*r, Math.sin(b)*r, Math.sin(a)*Math.cos(b)*r], i*3); }
@@ -1450,7 +1488,11 @@ async function renderThreeVisualiser(data){
   const pulseEdges = replayEdges.length ? replayEdges.slice(0, 110) : (threeVis.mode === 'neural' ? edges.slice(0, 90) : (threeVis.mode === 'city' ? edges.slice(0, 80) : []));
   const pulseGeom = new THREE.BufferGeometry(); const pulsePositions = new Float32Array(pulseEdges.length*3); pulseGeom.setAttribute('position', new THREE.BufferAttribute(pulsePositions,3));
   const pulsePoints = new THREE.Points(pulseGeom, new THREE.PointsMaterial({ color:colors.pulse, map:makePointTexture(THREE, 'star'), alphaTest:.03, size:threeVis.mode === 'city' ? 8.5 : (threeVis.mode === 'neural' ? 10.5 : 5.2), transparent:true, opacity:threeVis.mode === 'neural' ? (colors.light ? .54 : .98) : (threeVis.mode === 'city' ? .92 : .85), depthWrite:false, depthTest:false, blending:colors.light ? THREE.NormalBlending : THREE.AdditiveBlending })); group.add(pulsePoints);
-  const labelNodes = nodes.filter(n => !/^[a-f0-9]{10,}$/i.test(String(n.label||''))).sort((a,b)=>(b._degree+b._weight)-(a._degree+a._weight)).slice(0, threeVis.mode === 'city' ? 42 : (threeVis.mode === 'neural' ? 72 : 56));
+  const labelNodes = nodes.filter(n => !/^[a-f0-9]{10,}$/i.test(String(n.label||''))).sort((a,b)=>{
+    const ar = replayStateForNode(a) === 'included' ? 10000 : 0;
+    const br = replayStateForNode(b) === 'included' ? 10000 : 0;
+    return (br + b._degree + b._weight) - (ar + a._degree + a._weight);
+  }).slice(0, threeVis.mode === 'city' ? 42 : (threeVis.mode === 'neural' ? 72 : 56));
   $('#threeLabels').innerHTML = neuralAuraOverlay(threeVis.neuralRegions) + labelNodes.map((n,i)=>`<span class="three-label ${n.kind === 'memory' ? 'memory' : ''}" data-i="${i}">${esc(String(n.label||'').replace(/^memory:/,'mem ').slice(0,24))}</span>`).join('');
   Object.assign(threeVis, { THREE, renderer, scene, camera, group, nodes, edgePairs:edges, labels:labelNodes, pulses:pulseEdges, pulsePoints });
   $('#threeClusters').innerHTML = (data.clusters || []).map(c => `<span class="cluster-pill">${esc(c.label)} <strong>${Number(c.count).toLocaleString()}</strong></span>`).join('');

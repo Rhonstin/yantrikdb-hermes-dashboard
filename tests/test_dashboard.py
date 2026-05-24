@@ -82,6 +82,8 @@ def test_memory_city_visualiser_contract():
     assert "threeRunRecall" in html
     assert "threeRunRecall')?.addEventListener('click',runVisualiserRecall" in js
     assert "runVisualiserRecall" in js
+    assert "addReplayBeacons" in js
+    assert "replayStateForNode(a) === 'included'" in js
     assert 'data-three-mode=city' in css
 
 
