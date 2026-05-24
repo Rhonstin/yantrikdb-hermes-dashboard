@@ -86,6 +86,9 @@ def test_memory_city_visualiser_contract():
     assert "replayStateForNode(a) === 'included'" in js
     assert "preserveView" in js
     assert "renderThreeVisualiser(buildRecallOverlayData(threeVis.data, results), {preserveView:true})" in js
+    assert "X-ray district" in js
+    assert "dataset.cityStyle" in js
+    assert "bottomPad" in js
     assert 'data-three-mode=city' in css
 
 
