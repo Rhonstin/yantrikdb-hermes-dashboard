@@ -71,7 +71,7 @@ def test_memory_city_visualiser_contract():
     js = (Path(dashboard.STATIC_DIR) / "app.js").read_text()
     css = (Path(dashboard.STATIC_DIR) / "styles.css").read_text()
 
-    assert 'data-three-mode="city">Memory City</button>' in html
+    assert 'data-three-mode="city">Memory City</button>' not in html
     assert "Memory City inspector" in js
     assert "buildThreeCityPositions" in js
     assert "addMemoryCity" in js
@@ -81,13 +81,17 @@ def test_memory_city_visualiser_contract():
     assert "healthStateForNode" in js
     assert "threeRunRecall" in html
     assert "visualiser-recall-card" in html
+    assert "Highlight recall results" in html
+    assert "Search memory, inject hits" not in html
+    assert 'class="pill good">Recall replay' not in html
     assert "three-replay-status" not in html
     assert "threeRunRecall')?.addEventListener('click',runVisualiserRecall" in js
     assert "runVisualiserRecall" in js
     assert "addReplayBeacons" in js
     assert "replayStateForNode(a) === 'included'" in js
-    assert "preserveView" in js
-    assert "renderThreeVisualiser(buildRecallOverlayData(threeVis.data, results), {preserveView:true})" in js
+    assert "threeCameraState" in js
+    assert "applyThreeCameraState(viewState)" in js
+    assert "renderThreeVisualiser(buildRecallOverlayData(baseData, results), {preserveView:true, viewState})" in js
     assert "X-ray district" in js
     assert "dataset.cityStyle" in js
     assert "bottomPad" in js

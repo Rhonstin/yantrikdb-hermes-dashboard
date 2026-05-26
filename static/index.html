@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>YantrikDB for Hermes</title>
   <link rel="icon" href="/static/assets/favicon.svg?v=yantrikdb-white-favicon-2" type="image/svg+xml">
-  <link rel="stylesheet" href="/static/styles.css?v=memory-city-perf-55" />
+  <link rel="stylesheet" href="/static/styles.css?v=hide-city-tab-021" />
 </head>
 <body>
   <div class="grain"></div>
@@ -77,7 +77,6 @@
       <div class="section-tabs visualiser-tabs" aria-label="Visualiser mode">
         <button id="threeConstellationTab" data-three-mode="constellation" class="active">Constellation</button>
         <button id="threeNeuralTab" data-three-mode="neural">Neural Map</button>
-        <button id="threeCityTab" data-three-mode="city">Memory City</button>
       </div>
       <div class="toolbar visualiser-toolbar">
         <div class="visualiser-actions" aria-label="Visualiser controls">
@@ -90,14 +89,14 @@
       </div>
       <div class="visualiser-recall-card" aria-label="Recall replay controls">
         <div class="visualiser-recall-copy">
-          <span class="pill good">Recall replay</span>
-          <p>Search memory, inject hits, and light up the path without resetting the camera.</p>
+          <h2>Highlight recall results</h2>
+          <p>Run a recall query against the current view. Matching memories are added and highlighted in place.</p>
         </div>
         <div class="visualiser-recall">
-          <input id="threeRecallQuery" placeholder="Replay recall through the visualiser…" />
-          <button id="threeRunRecall" class="btn primary">Replay recall</button>
+          <input id="threeRecallQuery" placeholder="Search memories to highlight…" />
+          <button id="threeRunRecall" class="btn primary">Highlight results</button>
         </div>
-        <div id="threeReplayStatus" class="visualiser-recall-status"><strong>Ready</strong><span>Run a query to light up recall hits.</span></div>
+        <div id="threeReplayStatus" class="visualiser-recall-status"><strong>Ready</strong><span>Search to highlight matching memories in this view.</span></div>
       </div>
       <div class="three-layout">
         <div id="threeViewport" class="three-viewport glass" aria-label="Interactive 3D YantrikDB memory visualiser">
@@ -398,6 +397,6 @@
       <div class="modal-actions"><button id="confirmCancel" class="btn secondary">Cancel</button><button id="confirmOk" class="btn primary">Continue</button></div>
     </div>
   </div>
-  <script src="/static/app.js?v=memory-city-perf-55"></script>
+  <script src="/static/app.js?v=hide-city-tab-021"></script>
 </body>
 </html>

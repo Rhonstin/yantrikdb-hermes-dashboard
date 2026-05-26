@@ -59,7 +59,7 @@ from backend import HTTPBackend, NotImplementedHTTPBackend, make_backend, not_im
 
 HTTP_BACKEND: HTTPBackend | None = make_backend()
 
-app = FastAPI(title="YantrikDB for Hermes", version="0.2.0")
+app = FastAPI(title="YantrikDB for Hermes", version="0.2.1")
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["http://127.0.0.1", "http://localhost"],

@@ -841,6 +841,18 @@ function updateThreeUI(){
   const pause = $('#threePause'); if(pause) pause.textContent = threeVis.paused ? (compact ? 'Resume' : (threeVis.mode === 'neural' ? 'Resume drift' : (threeVis.mode === 'city' ? 'Resume traffic' : 'Resume rotation'))) : (compact ? 'Pause' : (threeVis.mode === 'neural' ? 'Pause drift' : (threeVis.mode === 'city' ? 'Pause traffic' : 'Pause rotation')));
   const pan = $('#threePanMode'); if(pan) pan.textContent = threeVis.panMode ? (compact ? 'Orbit' : 'Orbit mode') : (compact ? 'Pan' : 'Pan mode');
 }
+function threeCameraState(){
+  return {
+    yaw: threeVis.yaw, pitch: threeVis.pitch, cameraZ: threeVis.cameraZ,
+    panX: threeVis.panX, panY: threeVis.panY,
+    paused: threeVis.paused, panMode: threeVis.panMode
+  };
+}
+function applyThreeCameraState(viewState){
+  if(!viewState) return;
+  Object.assign(threeVis, viewState);
+  clampThreeCamera();
+}
 function resetThreeCamera(){ Object.assign(threeVis, { yaw: threeVis.mode === 'neural' ? .12 : (threeVis.mode === 'city' ? .62 : .70), pitch: threeVis.mode === 'neural' ? .10 : (threeVis.mode === 'city' ? .72 : .96), cameraZ: threeVis.mode === 'neural' ? 600 : (threeVis.mode === 'city' ? 1180 : 760), panX:0, panY: threeVis.mode === 'neural' ? -10 : (threeVis.mode === 'city' ? -24 : -84), lastT:0, lastRenderT:0 }); }
 function clearThreeScene(){
   if(threeVis.frame) cancelAnimationFrame(threeVis.frame);
@@ -1479,12 +1491,10 @@ function buildThreeLinkSegments(THREE, edges){
 }
 async function renderThreeVisualiser(data, opts={}){
   const preserveView = !!opts.preserveView;
-  const viewState = preserveView ? {
-    yaw: threeVis.yaw, pitch: threeVis.pitch, cameraZ: threeVis.cameraZ,
-    panX: threeVis.panX, panY: threeVis.panY, paused: threeVis.paused, panMode: threeVis.panMode
-  } : null;
+  const viewState = opts.viewState || (preserveView ? threeCameraState() : null);
   const THREE = await loadThreeModule();
   clearThreeScene(); threeVis.data = data; updateThreeUI(); threeInspectorDefault();
+  if(!data?.replay_overlay) threeVis.baseData = data;
   const viewport = $('#threeViewport'); if(!viewport) return;
   const colors = colorForTheme();
   let renderer;
@@ -1550,7 +1560,7 @@ async function renderThreeVisualiser(data, opts={}){
   $('#threeLabels').innerHTML = neuralAuraOverlay(threeVis.neuralRegions) + labelNodes.map((n,i)=>`<span class="three-label ${n.kind === 'memory' ? 'memory' : ''}" data-i="${i}">${esc(String(n.label||'').replace(/^memory:/,'mem ').slice(0,24))}</span>`).join('');
   Object.assign(threeVis, { THREE, renderer, scene, camera, group, nodes, edgePairs:edges, labels:labelNodes, pulses:pulseEdges, pulsePoints });
   $('#threeClusters').innerHTML = (data.clusters || []).map(c => `<span class="cluster-pill">${esc(c.label)} <strong>${Number(c.count).toLocaleString()}</strong></span>`).join('');
-  if(preserveView && viewState) Object.assign(threeVis, viewState);
+  if(preserveView && viewState) applyThreeCameraState(viewState);
   else resetThreeCamera();
   bindThreeControls(); resizeThree(); animateThree(0);
 }
@@ -1653,25 +1663,27 @@ async function runVisualiserRecall(){
   const input = $('#threeRecallQuery');
   const query = String(input?.value || '').trim();
   if(!query){ toast('Enter a recall query'); return; }
+  const viewState = threeCameraState();
   const btn = $('#threeRunRecall'); const old = btn?.textContent;
   try{
-    if(btn){ btn.disabled = true; btn.textContent = 'Replaying…'; }
+    if(btn){ btn.disabled = true; btn.textContent = 'Highlighting…'; }
     const data = await api('/api/recall',{method:'POST',body:JSON.stringify({query,top_k:12,namespace:ns(),include_consolidated:true,expand_entities:true})});
     const results = data.results || data.items || [];
     const rids = new Set(results.map(resultRid).filter(Boolean));
     const terms = new Set();
     results.forEach(r => String([r.domain,r.source,...(r.why_retrieved||r.reasons||[])].join(' ')).toLowerCase().split(/[^a-z0-9_.:-]+/).filter(x=>x.length>3).slice(0,8).forEach(x=>terms.add(x)));
     threeVis.replay = { query, results }; threeVis.replayNodes = rids; threeVis.replayEntities = terms; threeVis.replayEdges = new Set();
-    $('#threeReplayStatus').innerHTML = `<strong>Recall replay</strong><span>${esc(query)} · ${results.length} hit(s), injected into view</span>`;
-    if(threeVis.data) await renderThreeVisualiser(buildRecallOverlayData(threeVis.data, results), {preserveView:true});
+    $('#threeReplayStatus').innerHTML = `<strong>${results.length} highlighted</strong><span>${esc(query)}</span>`;
+    const baseData = threeVis.baseData || (threeVis.data?.replay_overlay ? null : threeVis.data) || threeVis.data;
+    if(baseData) await renderThreeVisualiser(buildRecallOverlayData(baseData, results), {preserveView:true, viewState});
   } catch(e){ toast(e.message); }
-  finally{ if(btn){ btn.disabled = false; btn.textContent = old || 'Replay recall'; } }
+  finally{ if(btn){ btn.disabled = false; btn.textContent = old || 'Highlight results'; } }
 }
 
-async function loadThreeVisualiser(){
+async function loadThreeVisualiser(opts={}){
   setVisualiserLoading(true, 'Building visualiser');
   try{
-    await renderThreeVisualiser(await api(`/api/constellation?namespace=${encodeURIComponent(ns())}&limit=320`));
+    await renderThreeVisualiser(await api(`/api/constellation?namespace=${encodeURIComponent(ns())}&limit=320`), opts);
   } finally {
     setVisualiserLoading(false);
   }
@@ -1747,7 +1759,7 @@ function pickThreeNode(e){
   if(best) inspectThreeNode(best);
 }
 
-async function loadVisualiser(force=false){ if(force) clearThreeScene(); await loadThreeVisualiser(); }
+async function loadVisualiser(force=false){ if(force) clearThreeScene(); await loadThreeVisualiser({preserveView:!force && !!threeVis.data}); }
 function stopVisualiser(){ clearThreeScene(); }
 function resetVisualiser(){ resetThreeCamera(); updateThreeUI(); }
 function setVisualiserMode(mode){ switchThreeMode(mode); }
