@@ -25,6 +25,7 @@
       <button class="nav-item" data-view="visualiser">Visualiser</button>
       <button class="nav-item" data-view="memories">Memories</button>
       <button class="nav-item" data-view="recall">Recall</button>
+      <button class="nav-item" data-view="skills">Learned Skills</button>
       <button class="nav-item" data-view="conflicts">Contradictions</button>
       <button class="nav-item" data-view="graph">Entity Graph</button>
       <button class="nav-item" data-view="lifecycle">Lifecycle</button>
@@ -157,6 +158,17 @@
         </div>
       </div>
       <div id="recallResults" class="recall-results"></div>
+    </section>
+
+    <section id="view-skills" class="view">
+      <div class="panel helper-card">
+        <div class="panel-head"><h2>Recently learned skills</h2><span id="recentSkillsStatus" class="muted">YantrikDB skill crystallization</span></div>
+        <p>Shows procedures and lessons that YantrikDB surfaced for future sessions. These are the skills the agent recently learned, not regular file-based Hermes skills.</p>
+        <div class="toolbar compact">
+          <button id="loadRecentSkills" class="btn secondary">Refresh skills</button>
+        </div>
+      </div>
+      <div id="recentSkillsList" class="memory-list"></div>
     </section>
 
     <section id="view-conflicts" class="view">

@@ -13,6 +13,7 @@ import os
 import re
 import secrets
 import sqlite3
+import sys
 import time
 from collections import Counter, defaultdict
 from pathlib import Path
@@ -39,6 +40,8 @@ DEFAULT_SETTINGS_PATH = Path.home() / ".hermes" / "plugin-data" / "yantrikdb-her
 LEGACY_SETTINGS_PATH = Path.home() / ".hermes" / "plugin-data" / "yantrikdb-dashboard" / "settings.json"
 SETTINGS_PATH = Path(os.environ.get("YANTRIKDB_DASHBOARD_SETTINGS_PATH") or (LEGACY_SETTINGS_PATH if LEGACY_SETTINGS_PATH.exists() and not DEFAULT_SETTINGS_PATH.exists() else DEFAULT_SETTINGS_PATH)).expanduser()
 YANTRIKDB_CONFIG_PATH = Path(os.environ.get("YANTRIKDB_CONFIG_PATH") or (Path.home() / ".hermes" / "yantrikdb.json")).expanduser()
+YANTRIKDB_PLUGIN_DIR = Path(os.environ.get("YANTRIKDB_PLUGIN_DIR") or (Path.home() / ".hermes" / "plugins" / "yantrikdb")).expanduser()
+RECENT_SKILLS_PATH = Path(os.environ.get("YANTRIKDB_RECENT_SKILLS_PATH") or (Path.home() / ".hermes" / "yantrikdb-recent-skills.json")).expanduser()
 WHATSAPP_SESSION_DIR = Path(os.environ.get("HERMES_WHATSAPP_SESSION_DIR") or (Path.home() / ".hermes" / "whatsapp" / "session")).expanduser()
 
 
@@ -108,6 +111,51 @@ def table_exists(name: str) -> bool:
     return bool(one("SELECT name FROM sqlite_master WHERE type='table' AND name=?", (name,)))
 
 
+def parse_manifest_version(path: Path) -> str | None:
+    try:
+        text = path.read_text()
+    except Exception:
+        return None
+    match = re.search(r"(?m)^version:\s*['\"]?([^'\"\s#]+)", text)
+    return match.group(1).strip() if match else None
+
+
+def plugin_manifest_versions(plugin_dir: Path | None = None) -> dict[str, str | None]:
+    root = plugin_dir or YANTRIKDB_PLUGIN_DIR
+    return {
+        "root_manifest": parse_manifest_version(root / "plugin.yaml"),
+        "bundled_manifest": parse_manifest_version(root / "yantrikdb" / "plugin.yaml"),
+    }
+
+
+def ensure_plugin_checkout_on_path() -> None:
+    # Historical no-op kept for tests/import stability. The dashboard must not
+    # prepend the Hermes plugin checkout here: the provider plugin module and
+    # the Rust/core package are both named ``yantrikdb``. Engine calls need the
+    # installed core package, while health can inspect the plugin checkout from
+    # the filesystem.
+    return
+
+
+def import_yantrikdb_module():
+    plugin_path = str(YANTRIKDB_PLUGIN_DIR)
+    existing = sys.modules.get("yantrikdb")
+    existing_origin = str(getattr(existing, "__file__", "") or "") if existing else ""
+    if plugin_path and existing_origin.startswith(plugin_path):
+        sys.modules.pop("yantrikdb", None)
+    removed_paths: list[tuple[int, str]] = []
+    for idx in range(len(sys.path) - 1, -1, -1):
+        if sys.path[idx] == plugin_path:
+            removed_paths.append((idx, sys.path.pop(idx)))
+    try:
+        import yantrikdb
+        return yantrikdb
+    finally:
+        for idx, value in sorted(removed_paths):
+            if value not in sys.path:
+                sys.path.insert(min(idx, len(sys.path)), value)
+
+
 def is_all_namespaces(namespace: str | None) -> bool:
     return str(namespace or "").strip().lower() in {"", "__all__", "all", "*"}
 
@@ -143,6 +191,22 @@ def clean_row(d: dict[str, Any]) -> dict[str, Any]:
             except Exception:
                 pass
     return out
+
+
+def json_safe(value: Any) -> Any:
+    if isinstance(value, bytes):
+        return {"hex": value.hex(), "bytes": len(value)}
+    if isinstance(value, dict):
+        return {str(k): json_safe(v) for k, v in value.items()}
+    if isinstance(value, list):
+        return [json_safe(v) for v in value]
+    if isinstance(value, tuple):
+        return [json_safe(v) for v in value]
+    return value
+
+
+def safe_items(items: Any) -> list[Any]:
+    return [json_safe(item) for item in list(items or [])]
 
 
 def load_dashboard_settings() -> dict[str, Any]:
@@ -236,7 +300,7 @@ def preferred_embedder_for_dim(dim: int) -> str | None:
 def engine():
     global _db_handle, _db_dim
     if _db_handle is None:
-        import yantrikdb
+        yantrikdb = import_yantrikdb_module()
         _db_dim = infer_embedding_dim()
         _db_handle = yantrikdb.YantrikDB(str(DB_PATH), embedding_dim=_db_dim)
         embedder = preferred_embedder_for_dim(_db_dim)
@@ -314,10 +378,19 @@ def health() -> dict[str, Any]:
         core_version = importlib_metadata.version("yantrikdb")
     except Exception:
         core_version = "unknown"
-    plugin_dir = Path.home() / ".hermes" / "plugins" / "yantrikdb"
+    plugin_dir = YANTRIKDB_PLUGIN_DIR
+    manifest_versions = plugin_manifest_versions(plugin_dir)
+    import_origin = "unknown"
+    try:
+        ymod = import_yantrikdb_module()
+        import_origin = str(getattr(ymod, "__file__", "") or "unknown")
+    except Exception as e:
+        import_origin = f"unavailable: {e}"
     plugin = {
         "path": str(plugin_dir),
         "exists": plugin_dir.exists(),
+        "versions": manifest_versions,
+        "import_origin": import_origin,
     }
     if (plugin_dir / ".git").exists():
         try:
@@ -326,6 +399,12 @@ def health() -> dict[str, Any]:
             plugin["commit"] = subprocess.check_output(["git", "rev-parse", "--short", "HEAD"], cwd=plugin_dir, text=True).strip()
         except Exception:
             pass
+    warnings: list[str] = []
+    manifest_set = {v for v in manifest_versions.values() if v}
+    if len(manifest_set) > 1:
+        warnings.append(f"Plugin manifests disagree: root={manifest_versions.get('root_manifest')}, bundled={manifest_versions.get('bundled_manifest')}")
+    if plugin_dir.exists() and import_origin != "unknown" and import_origin.startswith(str(plugin_dir)):
+        warnings.append("YantrikDB core import is shadowed by the Hermes plugin checkout; remove the plugin checkout from PYTHONPATH for dashboard engine calls.")
     namespaces = rows("SELECT namespace, COUNT(*) count FROM memories GROUP BY namespace ORDER BY count DESC") if table_exists("memories") else []
     return {
         "ok": True,
@@ -342,6 +421,7 @@ def health() -> dict[str, Any]:
         "embedder": preferred_embedder_for_dim(infer_embedding_dim()) or os.environ.get("YANTRIKDB_EMBEDDER") or "default",
         "embedding_dim": infer_embedding_dim(),
         "plugin": plugin,
+        "warnings": warnings,
         "namespaces": namespaces,
     }
 
@@ -1345,10 +1425,87 @@ def patterns(limit: int = Query(50, le=200)) -> dict[str, Any]:
 
 
 @app.get("/api/triggers")
-def triggers(limit: int = Query(50, le=200)) -> dict[str, Any]:
+def triggers(limit: int = Query(50, le=200), status: str = "") -> dict[str, Any]:
+    if HTTP_BACKEND is not None:
+        raise not_implemented_response("triggers")
+    try:
+        if not status or status == "pending":
+            if hasattr(engine(), "pending_triggers"):
+                out = engine().pending_triggers(limit=limit)
+                items = out.get("triggers", []) if isinstance(out, dict) else list(out or [])
+            else:
+                items = engine().get_pending_triggers(limit=int(limit))
+            return {"items": safe_items(items), "source": "engine"}
+    except Exception:
+        pass
     if not table_exists("trigger_log"):
         return {"items": []}
-    return {"items": rows("SELECT * FROM trigger_log ORDER BY created_at DESC LIMIT ?", (limit,))}
+    clauses = []
+    params: list[Any] = []
+    if status:
+        clauses.append("status=?")
+        params.append(status)
+    where = "WHERE " + " AND ".join(clauses) if clauses else ""
+    return {"items": safe_items(rows(f"SELECT * FROM trigger_log {where} ORDER BY created_at DESC LIMIT ?", tuple(params + [limit]))), "source": "sqlite"}
+
+
+@app.post("/api/triggers/{trigger_id}/acknowledge")
+def acknowledge_trigger(trigger_id: str, request: Request) -> dict[str, Any]:
+    if HTTP_BACKEND is not None:
+        raise not_implemented_response("trigger_acknowledge")
+    require_admin(request)
+    try:
+        out = engine().acknowledge_trigger(trigger_id)
+        return out if isinstance(out, dict) else {"ok": True, "trigger_id": trigger_id, "acknowledged": bool(out)}
+    except Exception as e:
+        raise HTTPException(500, f"acknowledge trigger failed: {e}")
+
+
+@app.post("/api/triggers/{trigger_id}/dismiss")
+def dismiss_trigger(trigger_id: str, request: Request) -> dict[str, Any]:
+    if HTTP_BACKEND is not None:
+        raise not_implemented_response("trigger_dismiss")
+    require_admin(request)
+    try:
+        out = engine().dismiss_trigger(trigger_id)
+        return out if isinstance(out, dict) else {"ok": True, "trigger_id": trigger_id, "dismissed": bool(out)}
+    except Exception as e:
+        raise HTTPException(500, f"dismiss trigger failed: {e}")
+
+
+@app.post("/api/triggers/{trigger_id}/act")
+def act_on_trigger(trigger_id: str, request: Request) -> dict[str, Any]:
+    if HTTP_BACKEND is not None:
+        raise not_implemented_response("trigger_act")
+    require_admin(request)
+    try:
+        out = engine().act_on_trigger(trigger_id)
+        return out if isinstance(out, dict) else {"ok": True, "trigger_id": trigger_id, "acted": bool(out)}
+    except Exception as e:
+        raise HTTPException(500, f"act on trigger failed: {e}")
+
+
+@app.get("/api/recent-skills")
+def recent_skills(limit: int = Query(10, le=50)) -> dict[str, Any]:
+    if not RECENT_SKILLS_PATH.exists():
+        return {"items": [], "path": str(RECENT_SKILLS_PATH), "surface_enabled": env_bool("YANTRIKDB_SURFACE_RECENT_SKILLS", True)}
+    try:
+        raw = json.loads(RECENT_SKILLS_PATH.read_text())
+    except Exception as e:
+        return {"items": [], "path": str(RECENT_SKILLS_PATH), "error": str(e), "surface_enabled": env_bool("YANTRIKDB_SURFACE_RECENT_SKILLS", True)}
+    cutoff = now() - (7 * 86400)
+    items = []
+    for item in raw if isinstance(raw, list) else []:
+        if not isinstance(item, dict):
+            continue
+        ts = float(item.get("ts") or 0)
+        if ts and ts < cutoff:
+            continue
+        clean = dict(item)
+        clean["age_seconds"] = max(0, int(now() - ts)) if ts else None
+        items.append(clean)
+    items.sort(key=lambda x: x.get("ts") or 0, reverse=True)
+    return {"items": items[:limit], "path": str(RECENT_SKILLS_PATH), "surface_enabled": env_bool("YANTRIKDB_SURFACE_RECENT_SKILLS", True)}
 
 
 @app.get("/api/sessions")

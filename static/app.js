@@ -1,7 +1,7 @@
 const $ = (s) => document.querySelector(s);
 const $$ = (s) => [...document.querySelectorAll(s)];
 const state = { health:null, stats:null, settings:null, defaultNamespace:'', selectedNamespace:'__all__', view:'overview', memoryOffset:0, selectedMemory:null, recentWrites:[], identityScope:null, actorIdentityFilter:'__all__' };
-const VALID_VIEWS = new Set(['overview','visualiser','memories','recall','conflicts','graph','identity-scope','lifecycle','ops','settings']);
+const VALID_VIEWS = new Set(['overview','visualiser','memories','recall','skills','conflicts','graph','identity-scope','lifecycle','ops','settings']);
 const ALL_NAMESPACES = '__all__';
 const DEFAULT_VIZ_CAMERA = { rotation:.55, tilt:.78, zoom:1, panX:0, panY:0 };
 const viz = { frame:0, nodes:[], edges:[], byId:{}, stars:[], data:null, mode:'constellation', paused:false, interaction:'rotate', drag:null, lastFrameTime:0, ...DEFAULT_VIZ_CAMERA };
@@ -37,6 +37,7 @@ async function api(path, opts={}){
   let data; try{ data=txt?JSON.parse(txt):{} }catch{ data={raw:txt}; }
   if(res.status===401){ showLogin(); throw new Error(data.detail || 'Dashboard password required'); }
   if(!res.ok) throw new Error(data.detail || data.error || res.statusText);
+  if(data && (data.ok===false || data.status==='failed')) throw new Error(data.reason || data.error || `${data.tool||'YantrikDB'} failed`);
   return data;
 }
 function ns(){ return state.selectedNamespace || ALL_NAMESPACES; }
@@ -88,7 +89,7 @@ function setView(view, opts={}){
   $$('.nav-item').forEach(b=>b.classList.toggle('active', b.dataset.view===view));
   document.body.classList.remove('menu-open');
   $('#menuToggle')?.setAttribute('aria-expanded','false');
-  const names={overview:'Memory Operations',visualiser:'Visualiser',memories:'Memory Browser',recall:'Recall',conflicts:'Contradictions',graph:'Entity Graph','identity-scope':'Identity & Scope',lifecycle:'Lifecycle',ops:'Maintenance',settings:'Settings'};
+  const names={overview:'Memory Operations',visualiser:'Visualiser',memories:'Memory Browser',recall:'Recall',skills:'Learned Skills',conflicts:'Contradictions',graph:'Entity Graph','identity-scope':'Identity & Scope',lifecycle:'Lifecycle',ops:'Maintenance',settings:'Settings'};
   $('#pageTitle').textContent=names[view]||view;
   if(view!=='visualiser') stopVisualiser();
   if(view!=='memories') closeMemoryDetail({silent:true});
@@ -96,6 +97,7 @@ function setView(view, opts={}){
   if(view==='overview' && !state.stats) loadStats();
   if(view==='visualiser') loadVisualiser();
   if(view==='memories') loadMemories(); if(view==='recall' && !$('#recallQuery').value) $('#recallQuery').value='What should this agent remember about YantrikDB dashboards?';
+  if(view==='skills') loadRecentSkills();
   if(view==='conflicts') loadConflicts(); if(view==='graph') loadEntities(); if(view==='identity-scope') loadIdentityScope(); if(view==='lifecycle') loadLifecycle(); if(view==='ops') loadHealthPanel(); if(view==='settings') loadSettings();
 }
 
@@ -124,7 +126,7 @@ async function init(){
   $('#memoryNamespaceFilter')?.addEventListener('change',()=>{ setNamespace($('#memoryNamespaceFilter').value); state.memoryOffset=0; writeRoute('memories',{replace:true}); refreshAll(); });
   $('#memoryApply').onclick=()=>{state.memoryOffset=0; writeRoute('memories',{replace:true}); loadMemories();};
   $('#memoryReset')?.addEventListener('click',()=>{ $('#memorySearch').value=''; $('#statusFilter').value='active'; $('#domainFilter').value=''; $('#sourceFilter').value=''; $('#sortFilter').value='created_at'; updateMemoryAdvancedFilters(); state.memoryOffset=0; writeRoute('memories',{replace:true}); loadMemories(); });
-  $('#runRecall').onclick=runRecall; $('#loadConflicts').onclick=loadConflicts;
+  $('#runRecall').onclick=runRecall; $('#loadRecentSkills')?.addEventListener('click',loadRecentSkills); $('#loadConflicts').onclick=loadConflicts;
   $('#threeRefresh')?.addEventListener('click',()=>loadVisualiser(true));
   $('#threeReset')?.addEventListener('click',()=>resetVisualiser());
   $('#threePanMode')?.addEventListener('click',()=>{ threeVis.panMode=!threeVis.panMode; updateThreeUI(); });
@@ -718,7 +720,31 @@ function showSelectableCopy(label,value){ const text=String(value||''); if(navig
 function confirmAction(title,message){ return new Promise(resolve=>{ const modal=$('#confirmModal'); $('#confirmTitle').textContent=title; $('#confirmMessage').textContent=message; modal.classList.remove('hidden'); const done=v=>{modal.classList.add('hidden'); $('#confirmOk').onclick=null; $('#confirmCancel').onclick=null; resolve(v);}; $('#confirmOk').onclick=()=>done(true); $('#confirmCancel').onclick=()=>done(false); modal.onclick=e=>{ if(e.target===modal) done(false); }; }); }
 async function forgetSelected(rid){ if(!await confirmAction('Forget this memory?','This removes the memory from active recall and keeps an audit record. Admin Mode must be enabled.'))return; try{ const out=await api(`/api/memory/${encodeURIComponent(rid)}/forget`,{method:'POST',body:'{}'}); toast('Memory forgotten'); await loadMemories(); $('#memoryDrawerBody').innerHTML=`<pre>${esc(JSON.stringify(out,null,2))}</pre>`;}catch(e){toast(e.message)} }
 
-async function runRecall(){ const body={query:$('#recallQuery').value,top_k:Number($('#recallTopK').value||10),namespace:ns(),domain:$('#recallDomain').value||null,source:$('#recallSource').value||null,include_consolidated:$('#recallConsolidated').checked,expand_entities:$('#recallGraph').checked}; const data=await api('/api/recall',{method:'POST',body:JSON.stringify(body)}); const results=data.results||data.items||[]; $('#recallResults').innerHTML=`<div class="panel"><div class="panel-head"><h2>Results</h2><span class="muted">${fmt(results.length)} hits</span></div></div>`+results.map((r,i)=>`<div class="recall-card"><div class="panel-head"><h2>#${i+1} ${esc(r.domain||r.type||'memory')}</h2><div class="recall-score">${Number(r.score||r.similarity||0).toFixed(3)}</div></div><p>${esc(r.text||r.content||JSON.stringify(r).slice(0,500))}</p><div class="meta-row">${(r.why_retrieved||r.reasons||[]).map(x=>`<span class="pill good">${esc(x)}</span>`).join('')}<span class="pill">${esc(r.rid||'')}</span></div><pre>${esc(JSON.stringify(r,null,2))}</pre></div>`).join('') || `<div class="empty">No recall results.</div>`; }
+function renderScoreBreakdown(scores={}){
+  const contributions = scores.contributions || {};
+  const entries = Object.entries(contributions).filter(([,v])=>Number.isFinite(Number(v)) && Number(v)!==0);
+  if(!entries.length) return '';
+  const max = Math.max(...entries.map(([,v])=>Math.abs(Number(v))), .001);
+  return `<div class="score-breakdown" aria-label="Recall score contribution breakdown">${entries.map(([name,value])=>{
+    const width=Math.max(4, Math.round((Math.abs(Number(value))/max)*100));
+    return `<div class="score-contrib"><span>${esc(name.replace(/_/g,' '))}</span><div class="score-contrib-track"><i class="score-contrib-bar" style="width:${width}%"></i></div><strong>${Number(value).toFixed(3)}</strong></div>`;
+  }).join('')}</div>`;
+}
+
+async function runRecall(){
+  const body={query:$('#recallQuery').value,top_k:Number($('#recallTopK').value||10),namespace:ns(),domain:$('#recallDomain').value||null,source:$('#recallSource').value||null,include_consolidated:$('#recallConsolidated').checked,expand_entities:$('#recallGraph').checked};
+  const data=await api('/api/recall',{method:'POST',body:JSON.stringify(body)});
+  const results=data.results||data.items||[];
+  $('#recallResults').innerHTML=`<div class="panel"><div class="panel-head"><h2>Results</h2><span class="muted">${fmt(results.length)} hits</span></div>${(data.certainty_reasons||[]).map(x=>`<span class="pill warn">${esc(x)}</span>`).join('')}</div>`+results.map((r,i)=>`<div class="recall-card"><div class="panel-head"><h2>#${i+1} ${esc(r.domain||r.type||'memory')}</h2><div class="recall-score">${Number(r.score||r.similarity||0).toFixed(3)}</div></div><p>${esc(r.text||r.content||JSON.stringify(r).slice(0,500))}</p>${renderScoreBreakdown(r.scores||{})}<div class="meta-row">${(r.why_retrieved||r.reasons||[]).map(x=>`<span class="pill good">${esc(x)}</span>`).join('')}<span class="pill">${esc(r.rid||'')}</span></div><details class="details-block"><summary>Raw recall row</summary><pre>${esc(JSON.stringify(r,null,2))}</pre></details></div>`).join('') || `<div class="empty">No recall results.</div>`;
+}
+
+function skillAgeLabel(seconds){ if(seconds===null||seconds===undefined) return 'unknown age'; if(seconds<90) return `${seconds}s ago`; if(seconds<86400) return `${Math.round(seconds/3600)||1}h ago`; return `${Math.round(seconds/86400)}d ago`; }
+async function loadRecentSkills(){
+  const data=await api('/api/recent-skills?limit=25');
+  const items=data.items||[];
+  $('#recentSkillsStatus').textContent = data.surface_enabled ? `${fmt(items.length)} recent · surfacing on` : `${fmt(items.length)} recent · surfacing off`;
+  $('#recentSkillsList').innerHTML = items.map(s=>`<article class="memory-item skill-card"><div class="memory-title">${esc(s.skill_id||'skill')} <span class="muted">${esc(s.skill_type||'skill')}</span></div><div class="memory-text">${esc((s.applies_to||[]).join(', ')||'No scope tags')}</div><div class="meta-row"><span class="pill good">${esc(skillAgeLabel(s.age_seconds))}</span><span class="pill">session ${esc(s.session_id||'—')}</span></div></article>`).join('') || `<div class="empty helpful-empty"><strong>No recently learned skills yet.</strong><span>When YantrikDB records a new skill, it will show here for seven days.</span><code>${esc(data.path||'')}</code></div>`;
+}
 
 async function loadConflicts(){ const data=await api(`/api/conflicts?namespace=${encodeURIComponent(ns())}&status=${encodeURIComponent($('#conflictStatus').value)}`); $('#conflictList').innerHTML=(data.items||[]).map(c=>`<div class="memory-item" data-id="${esc(c.conflict_id||c.id)}"><div class="memory-title">${esc(c.conflict_type||c.type||'conflict')} <span class="muted">${esc(c.status||'open')}</span></div><div class="memory-text">${esc(c.description||c.summary||JSON.stringify(c).slice(0,220))}</div><div class="meta-row"><span class="pill warn">priority ${esc(c.priority||'—')}</span><span class="pill">${esc(c.entity||'')}</span></div></div>`).join('') || '<div class="empty">No conflicts.</div>'; $$('#conflictList .memory-item').forEach(el=>el.onclick=()=>selectConflict(el.dataset.id)); }
 async function selectConflict(id){ const c=await api('/api/conflicts/'+encodeURIComponent(id)); $('#conflictDetail').innerHTML=`<div class="detail"><h2>Conflict ${esc(id)}</h2><pre>${esc(JSON.stringify(c,null,2))}</pre><div class="detail-section"><div class="label">Resolve</div><div class="toolbar compact"><select id="resolveStrategy"><option value="dismiss">dismiss</option><option value="keep_winner">keep_winner</option><option value="merge">merge</option><option value="keep_both">keep_both</option></select><input id="winnerRid" placeholder="winner rid"><input id="newText" placeholder="merged text"><button class="btn primary" onclick="resolveConflict('${esc(id)}')">Resolve</button></div></div></div>`; }
@@ -728,7 +754,27 @@ async function loadEntities(){ const data=await api(`/api/entities?q=${encodeURI
 async function loadGraph(entity){ if(!entity){toast('Enter/select entity');return;} const data=await api('/api/graph/'+encodeURIComponent(entity)+`?namespace=${encodeURIComponent(ns())}`); const empty=!(data.nodes?.length||data.edges?.length||data.memories?.length); $('#graphMeta').textContent=empty?`No graph data for ${entity}`:`${data.nodes.length} nodes · ${data.edges.length} edges`; drawGraph(data); $('#graphMemories').innerHTML=empty?'<div class="empty helpful-empty"><strong>No related memories for this entity.</strong><span>This graph only uses explicit YantrikDB entity links/relationship edges. Try Recall if you want normal semantic search.</span></div>':(data.memories||[]).map(memoryItem).join(''); }
 function drawGraph(g){ const svg=$('#graphSvg'); svg.innerHTML=''; const w=760,h=420,cx=w/2,cy=h/2; if(!(g.nodes?.length||g.edges?.length||g.memories?.length)){ svg.insertAdjacentHTML('beforeend',`<text class="graph-label graph-empty-label" x="${cx}" y="${cy}" text-anchor="middle">No entity graph data yet</text><text class="graph-label graph-empty-sub" x="${cx}" y="${cy+28}" text-anchor="middle">Use Recall for normal memory search</text>`); return; } const nodes=g.nodes.length?g.nodes:[{id:g.entity,label:g.entity}]; const pos={}; nodes.forEach((n,i)=>{ if(n.id===g.entity||i===0) pos[n.id]=[cx,cy]; else {const a=(i-1)/Math.max(1,nodes.length-1)*Math.PI*2; pos[n.id]=[cx+Math.cos(a)*260, cy+Math.sin(a)*150];}}); g.edges.forEach(e=>{const a=pos[e.source]||[cx,cy], b=pos[e.target]||[cx,cy]; svg.insertAdjacentHTML('beforeend',`<line class="graph-edge" x1="${a[0]}" y1="${a[1]}" x2="${b[0]}" y2="${b[1]}"/>`);}); nodes.forEach(n=>{const p=pos[n.id]; const root=n.id===g.entity||n.label===g.entity; svg.insertAdjacentHTML('beforeend',`<g><circle class="graph-node ${root?'graph-root':''}" cx="${p[0]}" cy="${p[1]}" r="${root?34:24}"></circle><text class="graph-label" x="${p[0]}" y="${p[1]+44}" text-anchor="middle">${esc(String(n.label||n.id).slice(0,22))}</text></g>`);}); }
 
-async function loadLifecycle(){ const [stale,upcoming,patterns,triggers]=await Promise.all([api(`/api/stale?namespace=${encodeURIComponent(ns())}`),api(`/api/upcoming?namespace=${encodeURIComponent(ns())}`),api('/api/patterns'),api('/api/triggers')]); $('#lifecycleCards').innerHTML=[['Stale candidates',stale.items?.length||0],['Upcoming',upcoming.items?.length||0],['Patterns',patterns.items?.length||0],['Triggers',triggers.items?.length||0]].map(m=>`<div class="stat-card"><div class="stat-label">${m[0]}</div><div class="stat-value">${fmt(m[1])}</div></div>`).join(''); $('#staleList').innerHTML=(stale.items||[]).map(memoryItem).join('')||'<div class="empty">No stale memories.</div>'; $('#upcomingList').innerHTML=(upcoming.items||[]).map(memoryItem).join('')||'<div class="empty">No upcoming memories.</div>'; $('#patternList').innerHTML=(patterns.items||[]).map(x=>`<div class="memory-item"><div class="memory-title">${esc(x.pattern_type||x.type||'pattern')}</div><pre>${esc(JSON.stringify(x,null,2))}</pre></div>`).join('')||'<div class="empty">No patterns.</div>'; $('#triggerList').innerHTML=(triggers.items||[]).map(x=>`<div class="memory-item"><div class="memory-title">${esc(x.trigger_type||x.type||'trigger')}</div><pre>${esc(JSON.stringify(x,null,2))}</pre></div>`).join('')||'<div class="empty">No triggers.</div>'; }
+function triggerId(t){ return t.trigger_id || t.id || ''; }
+function renderTrigger(t){
+  const id=triggerId(t);
+  const status=t.status || 'pending';
+  return `<div class="memory-item trigger-card"><div class="memory-title">${esc(t.trigger_type||t.type||'trigger')} <span class="muted">${esc(status)}</span></div><div class="memory-text">${esc(t.reason||t.description||JSON.stringify(t).slice(0,220))}</div><div class="meta-row"><span class="pill warn">urgency ${Number(t.urgency||0).toFixed(2)}</span><span class="pill">${esc(t.suggested_action||'review')}</span><span class="pill">${esc(id)}</span></div>${status==='pending'&&id?`<div class="trigger-actions"><button class="btn secondary tiny" onclick="acknowledgeTrigger('${esc(id)}')">Acknowledge</button><button class="btn ghost tiny" onclick="dismissTrigger('${esc(id)}')">Dismiss</button><button class="btn primary tiny" onclick="actOnTrigger('${esc(id)}')">Mark acted</button></div>`:''}<details class="details-block"><summary>Trigger details</summary><pre>${esc(JSON.stringify(t,null,2))}</pre></details></div>`;
+}
+async function triggerAction(id, action, label){
+  try{ await api(`/api/triggers/${encodeURIComponent(id)}/${action}`,{method:'POST',body:'{}'}); toast(label); await loadLifecycle(); }
+  catch(e){ toast(e.message); }
+}
+async function acknowledgeTrigger(id){ return triggerAction(id,'acknowledge','Trigger acknowledged'); }
+async function dismissTrigger(id){ if(!await confirmAction('Dismiss trigger?','This closes the trigger without recording follow-up action. Admin Mode must be enabled.')) return; return triggerAction(id,'dismiss','Trigger dismissed'); }
+async function actOnTrigger(id){ return triggerAction(id,'act','Trigger marked acted-on'); }
+async function loadLifecycle(){
+  const [stale,upcoming,patterns,triggers]=await Promise.all([api(`/api/stale?namespace=${encodeURIComponent(ns())}`),api(`/api/upcoming?namespace=${encodeURIComponent(ns())}`),api('/api/patterns'),api('/api/triggers')]);
+  $('#lifecycleCards').innerHTML=[['Stale candidates',stale.items?.length||0],['Upcoming',upcoming.items?.length||0],['Patterns',patterns.items?.length||0],['Triggers',triggers.items?.length||0]].map(m=>`<div class="stat-card"><div class="stat-label">${m[0]}</div><div class="stat-value">${fmt(m[1])}</div></div>`).join('');
+  $('#staleList').innerHTML=(stale.items||[]).map(memoryItem).join('')||'<div class="empty">No stale memories.</div>';
+  $('#upcomingList').innerHTML=(upcoming.items||[]).map(memoryItem).join('')||'<div class="empty">No upcoming memories.</div>';
+  $('#patternList').innerHTML=(patterns.items||[]).map(x=>`<div class="memory-item"><div class="memory-title">${esc(x.pattern_type||x.type||'pattern')}</div><pre>${esc(JSON.stringify(x,null,2))}</pre></div>`).join('')||'<div class="empty">No patterns.</div>';
+  $('#triggerList').innerHTML=(triggers.items||[]).map(renderTrigger).join('')||'<div class="empty">No triggers.</div>';
+}
 async function runThink(){ if(!await confirmAction('Run maintenance pass?','This will run housekeeping on the selected memory scope. Admin Mode must be enabled.'))return; const btn=$('#runThink'); const oldText=btn?.textContent; try{ if(btn){btn.disabled=true;btn.textContent='Running…';} $('#opsDetails')?.setAttribute('open',''); $('#opsOutput').textContent='Running maintenance…'; const out=await api('/api/think',{method:'POST',body:JSON.stringify({run_consolidation:true,run_conflict_scan:true,run_pattern_mining:false,run_personality:false})}); $('#opsOutput').textContent=JSON.stringify(out,null,2); toast('Maintenance complete'); await loadStats(); }catch(e){$('#opsDetails')?.setAttribute('open',''); $('#opsOutput').textContent=e.message; toast(e.message);} finally{ if(btn){btn.disabled=false;btn.textContent=oldText||'Run pass';} } }
 async function loadHealthPanel(){ const h=await api('/api/health'); $('#healthPayload').textContent=JSON.stringify(h,null,2); }
 

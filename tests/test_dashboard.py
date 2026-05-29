@@ -832,3 +832,128 @@ def test_mock_screenshot_generator_avoids_private_db_paths():
     assert "never reads the user's real YantrikDB memory store" in script
     assert "/Users/wysie/.hermes/yantrikdb-memory.db" not in script
     assert "mock-yantrikdb.db" in script
+
+
+
+def test_health_reports_import_source_and_plugin_version_warnings(monkeypatch, tmp_path):
+    db_path = tmp_path / "yantrikdb.db"
+    with sqlite3.connect(db_path) as conn:
+        conn.execute("CREATE TABLE memories (namespace TEXT)")
+    plugin_dir = tmp_path / "yantrikdb-plugin"
+    (plugin_dir / "yantrikdb").mkdir(parents=True)
+    (plugin_dir / "plugin.yaml").write_text("name: yantrikdb\nversion: 0.4.12\n")
+    (plugin_dir / "yantrikdb" / "plugin.yaml").write_text("name: yantrikdb\nversion: 0.4.17\n")
+    monkeypatch.setattr(dashboard, "DB_PATH", db_path)
+    monkeypatch.setattr(dashboard, "YANTRIKDB_PLUGIN_DIR", plugin_dir)
+    monkeypatch.setattr(dashboard.importlib_metadata, "version", lambda name: "0.2.4")
+
+    payload = dashboard.health()
+
+    assert payload["yantrikdb_version"] == "0.2.4"
+    assert payload["plugin"]["versions"]["root_manifest"] == "0.4.12"
+    assert payload["plugin"]["versions"]["bundled_manifest"] == "0.4.17"
+    assert any("Plugin manifests disagree" in w for w in payload["warnings"])
+
+
+def test_dashboard_engine_avoids_plugin_checkout_shadowing(monkeypatch, tmp_path):
+    plugin_dir = tmp_path / "yantrikdb-plugin"
+    package_dir = plugin_dir / "yantrikdb"
+    package_dir.mkdir(parents=True)
+    (package_dir / "__init__.py").write_text("# provider plugin, not core\n")
+    core_dir = tmp_path / "core"
+    core_pkg = core_dir / "yantrikdb"
+    core_pkg.mkdir(parents=True)
+    (core_pkg / "__init__.py").write_text(
+        "class YantrikDB:\n"
+        "    def __init__(self, path, embedding_dim=None):\n"
+        "        self.path = path; self.embedding_dim = embedding_dim; self.named = None\n"
+        "    def set_embedder_named(self, name):\n"
+        "        self.named = name\n"
+    )
+    db_path = tmp_path / "yantrikdb.db"
+    with sqlite3.connect(db_path) as conn:
+        conn.execute("CREATE TABLE memories (embedding BLOB)")
+    monkeypatch.syspath_prepend(str(core_dir))
+    monkeypatch.syspath_prepend(str(plugin_dir))
+    monkeypatch.setattr(dashboard, "YANTRIKDB_PLUGIN_DIR", plugin_dir)
+    monkeypatch.setattr(dashboard, "DB_PATH", db_path)
+    monkeypatch.setattr(dashboard, "_db_handle", None)
+    monkeypatch.setattr(dashboard, "_db_dim", None)
+    __import__('sys').modules.pop('yantrikdb', None)
+
+    handle = dashboard.engine()
+
+    assert handle.path == str(db_path)
+    assert "core" in __import__('yantrikdb').__file__
+
+
+def test_triggers_route_uses_core_get_pending_triggers(monkeypatch):
+    class FakeCoreEngine:
+        def get_pending_triggers(self, limit=10):
+            return [{"trigger_id": "t-core", "hlc": b"abc", "status": "pending"}]
+    monkeypatch.setattr(dashboard, "engine", lambda: FakeCoreEngine())
+    monkeypatch.setattr(dashboard, "HTTP_BACKEND", None)
+
+    payload = dashboard.triggers(limit=5, status="pending")
+
+    assert payload["source"] == "engine"
+    assert payload["items"][0]["trigger_id"] == "t-core"
+    assert payload["items"][0]["hlc"] == {"hex": "616263", "bytes": 3}
+
+
+def test_trigger_action_endpoints_call_engine_and_require_admin(monkeypatch):
+    class FakeEngine:
+        def __init__(self):
+            self.calls = []
+        def acknowledge_trigger(self, trigger_id):
+            self.calls.append(("ack", trigger_id)); return {"trigger_id": trigger_id, "acknowledged": True}
+        def dismiss_trigger(self, trigger_id):
+            self.calls.append(("dismiss", trigger_id)); return {"trigger_id": trigger_id, "dismissed": True}
+        def act_on_trigger(self, trigger_id):
+            self.calls.append(("act", trigger_id)); return {"trigger_id": trigger_id, "acted": True}
+    fake = FakeEngine()
+    monkeypatch.setattr(dashboard, "engine", lambda: fake)
+    monkeypatch.setattr(dashboard, "HTTP_BACKEND", None)
+    monkeypatch.setattr(dashboard, "ADMIN_MODE_ENV", True)
+    client = TestClient(dashboard.app)
+
+    assert client.post("/api/triggers/t1/acknowledge").json()["acknowledged"] is True
+    assert client.post("/api/triggers/t2/dismiss").json()["dismissed"] is True
+    assert client.post("/api/triggers/t3/act").json()["acted"] is True
+    assert fake.calls == [("ack", "t1"), ("dismiss", "t2"), ("act", "t3")]
+
+
+def test_recent_skills_api_reads_capped_recent_skill_file(tmp_path, monkeypatch):
+    recent = tmp_path / "recent.json"
+    recent.write_text(json.dumps([
+        {"skill_id": "git.commit_clean", "skill_type": "procedure", "applies_to": ["git", "workflow"], "ts": 1000, "session_id": "old"},
+        {"skill_id": "stale.skill", "skill_type": "lesson", "applies_to": [], "ts": 1000 - (8 * 86400), "session_id": "old"},
+    ]))
+    monkeypatch.setattr(dashboard, "RECENT_SKILLS_PATH", recent)
+    monkeypatch.setattr(dashboard, "now", lambda: 1000 + 3600)
+
+    payload = dashboard.recent_skills(limit=5)
+
+    assert payload["items"][0]["skill_id"] == "git.commit_clean"
+    assert payload["items"][0]["age_seconds"] == 3600
+    assert len(payload["items"]) == 1
+
+
+def test_dashboard_contract_for_0417_features():
+    html = Path("static/index.html").read_text()
+    js = Path("static/app.js").read_text()
+    css = Path("src/styles.css").read_text()
+    assert 'data-view="skills">Learned Skills</button>' in html
+    assert 'id="view-skills"' in html
+    assert 'id="recentSkillsList"' in html
+    assert "renderScoreBreakdown" in js
+    assert "score-contrib-bar" in js
+    assert "acknowledgeTrigger" in js
+    assert "dismissTrigger" in js
+    assert "actOnTrigger" in js
+    assert "/api/recent-skills" in js
+    assert "`/api/triggers/${encodeURIComponent(id)}/${action}`" in js
+    assert "acknowledge','Trigger acknowledged" in js
+    assert ".score-breakdown" in css
+    assert ".trigger-actions" in css
+    assert ".runtime-warning" in css
