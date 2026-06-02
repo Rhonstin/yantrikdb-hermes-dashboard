@@ -1,5 +1,7 @@
 # YantrikDB for Hermes Dashboard
 
+[![ko-fi](https://ko-fi.com/img/githubbutton_sm.svg)](https://ko-fi.com/H2H1ZAPL)
+
 A local-first web dashboard for browsing, visualising, and safely maintaining a YantrikDB memory store used by Hermes Agent.
 
 This is not meant to be a generic YantrikDB admin console. It is an operator dashboard for Hermes memory workflows: recall debugging, Identity & Scope checks, namespace coverage, contradiction review, memory browsing, entity/graph inspection, lifecycle signals, and read-only visualisation.
