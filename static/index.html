@@ -162,11 +162,25 @@
 
     <section id="view-skills" class="view">
       <div class="panel helper-card">
-        <div class="panel-head"><h2>Recently learned skills</h2><span id="recentSkillsStatus" class="muted">YantrikDB skill crystallization</span></div>
-        <p>Shows procedures and lessons that YantrikDB surfaced for future sessions. These are the skills the agent recently learned, not regular file-based Hermes skills.</p>
+        <div class="panel-head"><h2>Skill recall substrate</h2><span id="skillRecallStatus" class="muted">Checking YantrikDB skill recall…</span></div>
+        <p>DB-native procedural skills from YantrikDB: semantic search, auto-attach status, and outcome history. This is separate from regular file-based Hermes skills.</p>
+        <div id="skillRecallCards" class="stats mini-stats"></div>
+        <div id="skillRecallWarning" class="runtime-warning hidden"></div>
         <div class="toolbar compact">
-          <button id="loadRecentSkills" class="btn secondary">Refresh skills</button>
+          <input id="skillSearchQuery" placeholder="Find procedural skill…" />
+          <input id="skillSearchAppliesTo" placeholder="tag filter, e.g. python" />
+          <input id="skillSearchTopK" type="number" min="1" max="20" value="5" />
+          <button id="runSkillSearch" class="btn primary">Search skills</button>
+          <button id="loadRecentSkills" class="btn secondary">Refresh recent</button>
         </div>
+      </div>
+      <div class="split">
+        <div class="panel list-panel"><div id="skillSearchResults" class="memory-list"></div></div>
+        <div class="panel detail-panel"><div id="skillOutcomeDetail" class="empty">Search for a skill to inspect its body and outcome ledger.</div></div>
+      </div>
+      <div class="panel helper-card">
+        <div class="panel-head"><h2>Recently surfaced skills</h2><span id="recentSkillsStatus" class="muted">Recent auto-surface cache</span></div>
+        <p>Shows the last seven days of skills the provider surfaced for follow-up. Search above queries the DB-native skill substrate directly.</p>
       </div>
       <div id="recentSkillsList" class="memory-list"></div>
     </section>

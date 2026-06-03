@@ -939,12 +939,97 @@ def test_recent_skills_api_reads_capped_recent_skill_file(tmp_path, monkeypatch)
     assert len(payload["items"]) == 1
 
 
+def test_load_hermes_env_defaults_reads_missing_yantrikdb_values(tmp_path, monkeypatch):
+    env_path = tmp_path / ".env"
+    env_path.write_text("YANTRIKDB_SKILLS_ENABLED=true\nYANTRIKDB_TOP_K=13\nOTHER_SECRET=nope\n")
+    monkeypatch.setenv("HERMES_ENV_PATH", str(env_path))
+    monkeypatch.delenv("YANTRIKDB_SKILLS_ENABLED", raising=False)
+    monkeypatch.setenv("YANTRIKDB_TOP_K", "99")
+
+    loaded = dashboard.load_hermes_env_defaults()
+
+    assert loaded == {"YANTRIKDB_SKILLS_ENABLED": "true"}
+    assert __import__('os').environ["YANTRIKDB_SKILLS_ENABLED"] == "true"
+    assert __import__('os').environ["YANTRIKDB_TOP_K"] == "99"
+    assert "OTHER_SECRET" not in __import__('os').environ
+
+
+def test_skill_recall_status_reports_provider_config(monkeypatch):
+    class FakeConfig:
+        skills_enabled = True
+        auto_skill_attach = True
+        auto_skill_min_score = 0.61
+        auto_skill_max_bodies = 3
+        surface_recent_skills = False
+        top_k = 7
+        mode = "embedded"
+        db_path = "/tmp/yan.db"
+        namespace = "hermes"
+
+    monkeypatch.setattr(dashboard, "load_yantrikdb_plugin_config", lambda: FakeConfig())
+    monkeypatch.setattr(dashboard, "yantrikdb_skill_tool_names", lambda: ["yantrikdb_skill_search", "yantrikdb_skill_define", "yantrikdb_skill_outcome"])
+    monkeypatch.setattr(dashboard, "RECENT_SKILLS_PATH", Path("/tmp/no-recent-skills.json"))
+
+    payload = dashboard.skill_recall_status()
+
+    assert payload["installed"] is True
+    assert payload["skills_enabled"] is True
+    assert payload["skill_tools_exposed"] is True
+    assert payload["tool_names"] == ["yantrikdb_skill_search", "yantrikdb_skill_define", "yantrikdb_skill_outcome"]
+    assert payload["auto_skill_min_score"] == 0.61
+    assert payload["warning"] is None
+
+
+def test_skill_recall_search_normalizes_embedded_hits(monkeypatch):
+    class FakeBackend:
+        def __init__(self):
+            self.calls = []
+        def skill_search(self, query, *, top_k=None, applies_to=None):
+            self.calls.append((query, top_k, applies_to))
+            return {"skills": [{"text": "Use pytest first", "score": 0.77, "metadata": {"skill_id": "tdd.pytest", "skill_type": "procedure", "applies_to": ["tests", "python"]}}]}
+
+    fake = FakeBackend()
+    monkeypatch.setattr(dashboard, "skill_backend", lambda: fake)
+
+    payload = dashboard.skill_recall_search(dashboard.SkillSearchRequest(query="pytest", top_k=5, applies_to="python"))
+
+    assert fake.calls == [("pytest", 5, "python")]
+    assert payload["items"][0]["skill_id"] == "tdd.pytest"
+    assert payload["items"][0]["body"] == "Use pytest first"
+    assert payload["items"][0]["score"] == 0.77
+
+
+def test_skill_recall_outcomes_reads_outcome_substrate(tmp_path, monkeypatch):
+    db_path = tmp_path / "yantrikdb.db"
+    with sqlite3.connect(db_path) as conn:
+        conn.execute("CREATE TABLE memories (rid TEXT, text TEXT, namespace TEXT, domain TEXT, metadata TEXT, created_at REAL)")
+        conn.execute(
+            "INSERT INTO memories VALUES (?,?,?,?,?,?)",
+            ("r1", "outcome: skill=tdd.pytest succeeded=True", "outcome_substrate", "skill_outcome", json.dumps({"skill_id": "tdd.pytest", "succeeded": True, "note": "worked"}), 100.0),
+        )
+        conn.execute(
+            "INSERT INTO memories VALUES (?,?,?,?,?,?)",
+            ("r2", "outcome: skill=other succeeded=False", "outcome_substrate", "skill_outcome", json.dumps({"skill_id": "other", "succeeded": False}), 101.0),
+        )
+    monkeypatch.setattr(dashboard, "DB_PATH", db_path)
+    monkeypatch.setattr(dashboard, "HTTP_BACKEND", None)
+
+    payload = dashboard.skill_recall_outcomes("tdd.pytest", limit=10)
+
+    assert payload["total"] == 1
+    assert payload["items"][0]["rid"] == "r1"
+    assert payload["items"][0]["metadata_json"]["note"] == "worked"
+
+
 def test_dashboard_contract_for_0417_features():
     html = Path("static/index.html").read_text()
     js = Path("static/app.js").read_text()
     css = Path("src/styles.css").read_text()
     assert 'data-view="skills">Learned Skills</button>' in html
     assert 'id="view-skills"' in html
+    assert 'id="skillRecallCards"' in html
+    assert 'id="skillSearchResults"' in html
+    assert 'id="skillOutcomeDetail"' in html
     assert 'id="recentSkillsList"' in html
     assert "renderScoreBreakdown" in js
     assert "score-contrib-bar" in js
@@ -952,6 +1037,9 @@ def test_dashboard_contract_for_0417_features():
     assert "dismissTrigger" in js
     assert "actOnTrigger" in js
     assert "/api/recent-skills" in js
+    assert "/api/skill-recall/status" in js
+    assert "/api/skill-recall/search" in js
+    assert "showSkillOutcome" in js
     assert "`/api/triggers/${encodeURIComponent(id)}/${action}`" in js
     assert "acknowledge','Trigger acknowledged" in js
     assert ".score-breakdown" in css

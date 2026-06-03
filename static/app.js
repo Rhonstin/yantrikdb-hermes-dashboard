@@ -97,7 +97,7 @@ function setView(view, opts={}){
   if(view==='overview' && !state.stats) loadStats();
   if(view==='visualiser') loadVisualiser();
   if(view==='memories') loadMemories(); if(view==='recall' && !$('#recallQuery').value) $('#recallQuery').value='What should this agent remember about YantrikDB dashboards?';
-  if(view==='skills') loadRecentSkills();
+  if(view==='skills') { loadSkillRecallStatus(); loadRecentSkills(); }
   if(view==='conflicts') loadConflicts(); if(view==='graph') loadEntities(); if(view==='identity-scope') loadIdentityScope(); if(view==='lifecycle') loadLifecycle(); if(view==='ops') loadHealthPanel(); if(view==='settings') loadSettings();
 }
 
@@ -126,7 +126,7 @@ async function init(){
   $('#memoryNamespaceFilter')?.addEventListener('change',()=>{ setNamespace($('#memoryNamespaceFilter').value); state.memoryOffset=0; writeRoute('memories',{replace:true}); refreshAll(); });
   $('#memoryApply').onclick=()=>{state.memoryOffset=0; writeRoute('memories',{replace:true}); loadMemories();};
   $('#memoryReset')?.addEventListener('click',()=>{ $('#memorySearch').value=''; $('#statusFilter').value='active'; $('#domainFilter').value=''; $('#sourceFilter').value=''; $('#sortFilter').value='created_at'; updateMemoryAdvancedFilters(); state.memoryOffset=0; writeRoute('memories',{replace:true}); loadMemories(); });
-  $('#runRecall').onclick=runRecall; $('#loadRecentSkills')?.addEventListener('click',loadRecentSkills); $('#loadConflicts').onclick=loadConflicts;
+  $('#runRecall').onclick=runRecall; $('#loadRecentSkills')?.addEventListener('click',loadRecentSkills); $('#runSkillSearch')?.addEventListener('click',runSkillSearch); $('#skillSearchQuery')?.addEventListener('keydown',(e)=>{ if(e.key==='Enter') runSkillSearch(); }); $('#loadConflicts').onclick=loadConflicts;
   $('#threeRefresh')?.addEventListener('click',()=>loadVisualiser(true));
   $('#threeReset')?.addEventListener('click',()=>resetVisualiser());
   $('#threePanMode')?.addEventListener('click',()=>{ threeVis.panMode=!threeVis.panMode; updateThreeUI(); });
@@ -738,6 +738,56 @@ async function runRecall(){
   $('#recallResults').innerHTML=`<div class="panel"><div class="panel-head"><h2>Results</h2><span class="muted">${fmt(results.length)} hits</span></div>${(data.certainty_reasons||[]).map(x=>`<span class="pill warn">${esc(x)}</span>`).join('')}</div>`+results.map((r,i)=>`<div class="recall-card"><div class="panel-head"><h2>#${i+1} ${esc(r.domain||r.type||'memory')}</h2><div class="recall-score">${Number(r.score||r.similarity||0).toFixed(3)}</div></div><p>${esc(r.text||r.content||JSON.stringify(r).slice(0,500))}</p>${renderScoreBreakdown(r.scores||{})}<div class="meta-row">${(r.why_retrieved||r.reasons||[]).map(x=>`<span class="pill good">${esc(x)}</span>`).join('')}<span class="pill">${esc(r.rid||'')}</span></div><details class="details-block"><summary>Raw recall row</summary><pre>${esc(JSON.stringify(r,null,2))}</pre></details></div>`).join('') || `<div class="empty">No recall results.</div>`;
 }
 
+function renderSkillRecallCards(data){
+  const cards=$('#skillRecallCards');
+  if(!cards) return;
+  const exposed=data.skill_tools_exposed?'Exposed':'Disabled';
+  cards.innerHTML=[
+    ['Skill tools', exposed],
+    ['Auto attach', data.auto_skill_attach?'On':'Off'],
+    ['Min score', data.auto_skill_min_score ?? '—'],
+    ['Max bodies', data.auto_skill_max_bodies ?? '—'],
+    ['Recent', data.recent_skills_count ?? 0],
+  ].map(([label,value])=>`<div class="stat-card"><div class="stat-label">${esc(label)}</div><div class="stat-value">${esc(value)}</div></div>`).join('');
+}
+async function loadSkillRecallStatus(){
+  try{
+    const data=await api('/api/skill-recall/status');
+    $('#skillRecallStatus').textContent = data.installed ? `${esc(data.mode||'embedded')} · ${data.skills_enabled?'skills enabled':'skills disabled'}` : 'skill recall unavailable';
+    renderSkillRecallCards(data);
+    const warn=$('#skillRecallWarning');
+    if(warn){ warn.textContent=data.warning||''; warn.classList.toggle('hidden', !data.warning); }
+  }catch(e){ $('#skillRecallStatus').textContent=e.message; }
+}
+function renderSkillCard(s){
+  const id=s.skill_id||'unknown-skill';
+  const score=Number.isFinite(Number(s.score))?Number(s.score).toFixed(3):'—';
+  const tags=(s.applies_to||[]).join(', ')||'No tags';
+  return `<article class="memory-item skill-card" data-skill-id="${esc(id)}"><div class="memory-title">${esc(id)} <span class="muted">${esc(s.skill_type||'skill')}</span></div><div class="memory-text">${esc((s.body||'').slice(0,420)||'No body preview')}</div><div class="meta-row"><span class="pill good">score ${esc(score)}</span><span class="pill">${esc(tags)}</span></div></article>`;
+}
+async function runSkillSearch(){
+  const query=$('#skillSearchQuery')?.value?.trim() || '';
+  if(!query){ toast('Enter a skill search query'); return; }
+  const body={query, top_k:Number($('#skillSearchTopK')?.value||5), applies_to:$('#skillSearchAppliesTo')?.value?.trim()||null};
+  try{
+    const data=await api('/api/skill-recall/search',{method:'POST',body:JSON.stringify(body)});
+    const items=data.items||[];
+    $('#skillSearchResults').innerHTML = items.map(renderSkillCard).join('') || '<div class="empty helpful-empty"><strong>No DB-native skills matched.</strong><span>If skill recall is disabled, enable YANTRIKDB_SKILLS_ENABLED and restart the gateway/session.</span></div>';
+    $$('#skillSearchResults .skill-card').forEach((el,i)=>el.onclick=()=>showSkillOutcome(items[i]));
+    if(items[0]) showSkillOutcome(items[0]);
+  }catch(e){ toast(e.message); $('#skillSearchResults').innerHTML=`<div class="empty">${esc(e.message)}</div>`; }
+}
+async function showSkillOutcome(skill){
+  const id=skill.skill_id||'';
+  const panel=$('#skillOutcomeDetail');
+  if(!panel) return;
+  panel.innerHTML=`<div class="detail"><h2>${esc(id||'Skill')}</h2><div class="meta-row">${(skill.applies_to||[]).map(x=>`<span class="pill">${esc(x)}</span>`).join('')}<span class="pill good">${esc(skill.skill_type||'skill')}</span></div><pre>${esc(skill.body||'No body')}</pre><div class="label">Outcome ledger</div><div id="skillOutcomeRows" class="memory-list"><div class="empty">Loading outcomes…</div></div></div>`;
+  if(!id) return;
+  try{
+    const data=await api(`/api/skill-recall/${encodeURIComponent(id)}/outcomes?limit=25`);
+    $('#skillOutcomeRows').innerHTML=(data.items||[]).map(o=>`<div class="memory-item"><div class="memory-title">${(o.metadata_json||{}).succeeded===false?'Failed':'Succeeded'} <span class="muted">${esc(o.created_at_iso||'')}</span></div><div class="memory-text">${esc((o.metadata_json||{}).note || o.text || '')}</div><div class="meta-row"><span class="pill">${esc(o.rid||'')}</span></div></div>`).join('') || '<div class="empty">No outcomes recorded for this skill yet.</div>';
+  }catch(e){ $('#skillOutcomeRows').innerHTML=`<div class="empty">${esc(e.message)}</div>`; }
+}
 function skillAgeLabel(seconds){ if(seconds===null||seconds===undefined) return 'unknown age'; if(seconds<90) return `${seconds}s ago`; if(seconds<86400) return `${Math.round(seconds/3600)||1}h ago`; return `${Math.round(seconds/86400)}d ago`; }
 async function loadRecentSkills(){
   const data=await api('/api/recent-skills?limit=25');

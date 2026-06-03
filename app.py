@@ -309,6 +309,77 @@ def engine():
     return _db_handle
 
 
+def load_hermes_env_defaults() -> dict[str, str]:
+    """Read Hermes .env values without overriding explicit launchd/process env.
+
+    The dashboard runs as its own LaunchAgent, so it does not automatically
+    inherit the gateway/agent shell environment. Loading missing YANTRIKDB_*
+    values from the same Hermes .env keeps dashboard config aligned with the
+    agent side while still allowing dashboard-specific launchd overrides.
+    """
+    env_path = Path(os.environ.get("HERMES_ENV_PATH") or (Path(os.environ.get("HERMES_HOME") or Path.home() / ".hermes") / ".env")).expanduser()
+    loaded: dict[str, str] = {}
+    if not env_path.exists():
+        return loaded
+    try:
+        lines = env_path.read_text(encoding="utf-8").splitlines()
+    except Exception:
+        return loaded
+    for raw in lines:
+        line = raw.strip()
+        if not line or line.startswith("#") or "=" not in line:
+            continue
+        key, value = line.split("=", 1)
+        key = key.strip()
+        if not key.startswith("YANTRIKDB_") or key in os.environ:
+            continue
+        value = value.strip().strip('"').strip("'")
+        os.environ[key] = value
+        loaded[key] = value
+    return loaded
+
+
+def load_yantrikdb_plugin_config():
+    load_hermes_env_defaults()
+    from yantrikdb_hermes_plugin.client import YantrikDBConfig
+    return YantrikDBConfig.load()
+
+
+def yantrikdb_skill_tool_names() -> list[str]:
+    try:
+        import yantrikdb_hermes_plugin as plugin
+        schemas = getattr(plugin, "ALL_TOOL_SCHEMAS", []) or []
+    except Exception:
+        return []
+    return [str(s.get("name")) for s in schemas if str(s.get("name", "")).startswith("yantrikdb_skill_")]
+
+
+def skill_backend():
+    import yantrikdb_hermes_plugin as plugin
+    cfg = load_yantrikdb_plugin_config()
+    return plugin.make_backend(cfg)
+
+
+def normalize_skill_hit(hit: dict[str, Any]) -> dict[str, Any]:
+    meta = hit.get("metadata") or hit.get("metadata_json") or {}
+    if isinstance(meta, str):
+        meta = parse_json(meta, {}) or {}
+    body = (hit.get("body") or hit.get("text") or hit.get("content") or "").strip()
+    return {
+        "rid": hit.get("rid") or hit.get("id"),
+        "skill_id": hit.get("skill_id") or meta.get("skill_id"),
+        "skill_type": hit.get("skill_type") or meta.get("skill_type"),
+        "applies_to": hit.get("applies_to") or meta.get("applies_to") or [],
+        "triggers": hit.get("triggers") or meta.get("triggers") or [],
+        "supersedes_skill_id": hit.get("supersedes_skill_id") or meta.get("supersedes_skill_id"),
+        "version": hit.get("version") or meta.get("version"),
+        "score": hit.get("score") or hit.get("similarity"),
+        "body": body,
+        "metadata_json": meta,
+        "raw": json_safe(hit),
+    }
+
+
 class RecallRequest(BaseModel):
     query: str
     top_k: int = 10
@@ -317,6 +388,13 @@ class RecallRequest(BaseModel):
     source: Optional[str] = None
     include_consolidated: bool = False
     expand_entities: bool = True
+
+
+class SkillSearchRequest(BaseModel):
+    query: str
+    top_k: int = 10
+    applies_to: Optional[str] = None
+    min_score: Optional[float] = None
 
 
 class ResolveRequest(BaseModel):
@@ -1506,6 +1584,89 @@ def recent_skills(limit: int = Query(10, le=50)) -> dict[str, Any]:
         items.append(clean)
     items.sort(key=lambda x: x.get("ts") or 0, reverse=True)
     return {"items": items[:limit], "path": str(RECENT_SKILLS_PATH), "surface_enabled": env_bool("YANTRIKDB_SURFACE_RECENT_SKILLS", True)}
+
+
+@app.get("/api/skill-recall/status")
+def skill_recall_status() -> dict[str, Any]:
+    try:
+        cfg = load_yantrikdb_plugin_config()
+        tool_names = yantrikdb_skill_tool_names()
+        skills_enabled = bool(getattr(cfg, "skills_enabled", False))
+        warning = None if skills_enabled else "YantrikDB skill tools are installed but disabled. Set YANTRIKDB_SKILLS_ENABLED=true and restart the gateway/session to expose them."
+        recent_count = 0
+        if RECENT_SKILLS_PATH.exists():
+            recent_raw = parse_json(RECENT_SKILLS_PATH.read_text(), []) or []
+            recent_count = len(recent_raw) if isinstance(recent_raw, list) else 0
+        return {
+            "installed": True,
+            "mode": getattr(cfg, "mode", None),
+            "db_path": getattr(cfg, "db_path", None),
+            "namespace": getattr(cfg, "namespace", None),
+            "skills_enabled": skills_enabled,
+            "skill_tools_exposed": skills_enabled and bool(tool_names),
+            "tool_names": tool_names if skills_enabled else [],
+            "available_tool_names": tool_names,
+            "auto_skill_attach": bool(getattr(cfg, "auto_skill_attach", False)),
+            "auto_skill_min_score": getattr(cfg, "auto_skill_min_score", None),
+            "auto_skill_max_bodies": getattr(cfg, "auto_skill_max_bodies", None),
+            "surface_recent_skills": bool(getattr(cfg, "surface_recent_skills", False)),
+            "top_k": getattr(cfg, "top_k", None),
+            "recent_skills_path": str(RECENT_SKILLS_PATH),
+            "recent_skills_count": recent_count,
+            "skill_namespace": "skill_substrate",
+            "outcome_namespace": "outcome_substrate",
+            "warning": warning,
+        }
+    except Exception as e:
+        return {"installed": False, "error": str(e), "warning": "YantrikDB skill recall provider could not be inspected."}
+
+
+@app.post("/api/skill-recall/search")
+def skill_recall_search(req: SkillSearchRequest) -> dict[str, Any]:
+    if not req.query.strip():
+        raise HTTPException(400, "query is required")
+    try:
+        resp = skill_backend().skill_search(req.query, top_k=req.top_k, applies_to=req.applies_to)
+    except Exception as e:
+        raise HTTPException(500, f"skill search failed: {e}")
+    items = [normalize_skill_hit(x) for x in (resp.get("skills") or resp.get("items") or [])]
+    min_score = req.min_score
+    if min_score is not None:
+        items = [x for x in items if x.get("score") is None or float(x.get("score") or 0) >= min_score]
+    return {"items": items, "total": len(items), "raw_total": resp.get("total")}
+
+
+@app.get("/api/skill-recall/{skill_id}/outcomes")
+def skill_recall_outcomes(skill_id: str, limit: int = Query(25, le=100)) -> dict[str, Any]:
+    if HTTP_BACKEND is not None:
+        raise not_implemented_response("skill_outcomes")
+    if not table_exists("memories"):
+        return {"items": [], "total": 0, "skill_id": skill_id}
+    try:
+        candidates = rows(
+            """
+            SELECT rid,text,domain,metadata,created_at
+            FROM memories
+            WHERE namespace=? AND (metadata LIKE ? OR text LIKE ?)
+            ORDER BY created_at DESC
+            LIMIT ?
+            """,
+            ("outcome_substrate", f"%{skill_id}%", f"%{skill_id}%", int(limit) * 3),
+        )
+    except Exception as e:
+        raise HTTPException(500, f"skill outcomes query failed: {e}")
+    items: list[dict[str, Any]] = []
+    for row in candidates:
+        clean = clean_row(row)
+        meta = clean.get("metadata_json") or {}
+        if meta.get("skill_id") != skill_id and f"skill={skill_id}" not in str(clean.get("text") or ""):
+            continue
+        items.append(clean)
+        if len(items) >= limit:
+            break
+    successes = sum(1 for x in items if (x.get("metadata_json") or {}).get("succeeded") is True)
+    failures = sum(1 for x in items if (x.get("metadata_json") or {}).get("succeeded") is False)
+    return {"items": items, "total": len(items), "successes": successes, "failures": failures, "skill_id": skill_id}
 
 
 @app.get("/api/sessions")
