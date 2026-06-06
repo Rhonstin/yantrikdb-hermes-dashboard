@@ -1,5 +1,5 @@
 name: yantrikdb-hermes-dashboard
-version: 0.2.0
+version: 0.3.0
 description: Local-only YantrikDB dashboard for Hermes Agent memory operations
 category: dashboard
 author: wysie
