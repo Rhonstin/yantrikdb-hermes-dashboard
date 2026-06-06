@@ -238,23 +238,33 @@
             <em id="opsScopeCount"></em>
           </div>
           <div class="action-list">
-            <div class="action-row">
-              <div>
-                <strong>Maintenance pass</strong>
-                <span>Consolidates duplicates, scans contradictions, and updates memory metadata.</span>
-              </div>
-              <button id="runThink" class="btn primary">Run pass</button>
+          <div class="action-row">
+            <div>
+              <strong>Maintenance pass</strong>
+              <span>Consolidates duplicates, scans contradictions, and updates memory metadata.</span>
             </div>
-            <div class="action-row secondary-row">
-              <div>
-                <strong>Health check</strong>
-                <span>Refresh dashboard configuration, database path, plugin state, and namespace counts.</span>
-              </div>
-              <button id="refreshHealth" class="btn secondary">Refresh</button>
-            </div>
+            <button id="runThink" class="btn primary">Run pass</button>
           </div>
+          <div class="action-row">
+            <div>
+              <strong>v0.6 hygiene scan</strong>
+              <span>Review open contradictions and low-usefulness recall candidates before applying cleanup.</span>
+            </div>
+            <button id="runHygieneScan" class="btn secondary">Scan</button>
+          </div>
+          <div class="action-row secondary-row">
+            <div>
+              <strong>Health check</strong>
+              <span>Refresh dashboard configuration, database path, plugin state, and namespace counts.</span>
+            </div>
+            <button id="refreshHealth" class="btn secondary">Refresh</button>
+          </div>
+          </div>
+          <div id="hygieneCards" class="stats mini-stats"></div>
+          <div id="recallFeedbackCards" class="stats mini-stats"></div>
+          <div id="hygieneList" class="memory-list compact-list"></div>
           <details id="opsDetails" class="details-block">
-            <summary>Show maintenance output</summary>
+<summary>Show maintenance output</summary>
             <pre id="opsOutput"></pre>
           </details>
         </div>
@@ -364,6 +374,23 @@
               <div><strong>Recall result count</strong><small>Default number of memories to retrieve for recall.</small><code class="config-name">top_k</code></div>
               <input id="topKSetting" type="number" min="1" max="50" aria-label="Recall result count" />
               <button id="saveMemoryScoping" class="btn primary" type="button">Save memory settings</button>
+            </div>
+            <div class="setting-section-label">v0.6 recall tuning & hygiene</div>
+            <label class="setting-row switch-row">
+              <span><strong>Self-tuning recall</strong><small>Allow explicit reinforcement feedback to boost memories that proved useful.</small><code class="config-name">self_tuning_recall</code></span>
+              <span class="switch-control-wrap"><input id="selfTuningRecallToggle" type="checkbox" /><span class="switch-control" aria-hidden="true"></span></span>
+            </label>
+            <div class="setting-row compact-number-row">
+              <div><strong>Max reinforcement boost</strong><small>Cap for per-memory ranking lift from useful recall feedback.</small><code class="config-name">self_tuning_max_boost</code></div>
+              <input id="selfTuningMaxBoost" type="number" min="0" max="1" step="0.01" aria-label="Self-tuning max boost" />
+            </div>
+            <label class="setting-row switch-row">
+              <span><strong>Surface hygiene candidates</strong><small>Show low-usefulness recall candidates in the agent prompt for cleanup review.</small><code class="config-name">surface_hygiene</code></span>
+              <span class="switch-control-wrap"><input id="surfaceHygieneToggle" type="checkbox" /><span class="switch-control" aria-hidden="true"></span></span>
+            </label>
+            <div class="setting-row compact-number-row">
+              <div><strong>Hygiene candidates shown</strong><small>Maximum low-usefulness candidates surfaced to the agent.</small><code class="config-name">hygiene_max_surfaced</code></div>
+              <input id="hygieneMaxSurfaced" type="number" min="1" max="50" aria-label="Hygiene candidates shown" />
             </div>
             <div class="setting-section-label">Dashboard access</div>
             <label class="setting-row switch-row">

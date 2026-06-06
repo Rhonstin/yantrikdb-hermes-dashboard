@@ -177,6 +177,121 @@ def test_settings_exposes_and_updates_yantrikdb_runtime_config(tmp_path, monkeyp
     assert saved["top_k"] == 7
 
 
+def test_settings_exposes_and_updates_v06_self_tuning_config(tmp_path, monkeypatch):
+    settings_path = tmp_path / "settings.json"
+    config_path = tmp_path / "yantrikdb.json"
+    config_path.write_text(json.dumps({
+        "self_tuning_recall": True,
+        "self_tuning_max_boost": 0.2,
+        "surface_hygiene": False,
+        "hygiene_max_surfaced": 4,
+    }))
+    monkeypatch.setattr(dashboard, "SETTINGS_PATH", settings_path)
+    monkeypatch.setattr(dashboard, "YANTRIKDB_CONFIG_PATH", config_path)
+    monkeypatch.setattr(dashboard, "ADMIN_MODE_ENV", False)
+    client = TestClient(dashboard.app)
+
+    response = client.get("/api/settings")
+    assert response.status_code == 200
+    ycfg = response.json()["yantrikdb"]
+    assert ycfg["self_tuning_recall"] is True
+    assert ycfg["self_tuning_max_boost"] == 0.2
+    assert ycfg["surface_hygiene"] is False
+    assert ycfg["hygiene_max_surfaced"] == 4
+
+    response = client.post("/api/settings", json={
+        "admin_mode": True,
+        "self_tuning_recall": False,
+        "self_tuning_max_boost": 0.12,
+        "surface_hygiene": True,
+        "hygiene_max_surfaced": 9,
+    })
+    assert response.status_code == 200
+    saved = json.loads(config_path.read_text())
+    assert saved["self_tuning_recall"] is False
+    assert saved["self_tuning_max_boost"] == 0.12
+    assert saved["surface_hygiene"] is True
+    assert saved["hygiene_max_surfaced"] == 9
+
+
+def test_recall_feedback_api_summarizes_v06_ledger(tmp_path, monkeypatch):
+    feedback_path = tmp_path / "yantrikdb-recall-feedback.json"
+    feedback_path.write_text(json.dumps({
+        "rid-useful": {"surfaced": 5, "reinforced": 2, "last_ts": 1000},
+        "rid-noisy": {"surfaced": 7, "reinforced": 0, "last_ts": 900},
+    }))
+    monkeypatch.setattr(dashboard, "RECALL_FEEDBACK_PATH", feedback_path)
+    monkeypatch.setattr(dashboard, "now", lambda: 1200)
+
+    payload = dashboard.recall_feedback(limit=10)
+
+    assert payload["summary"] == {"tracked": 2, "surfaced": 12, "reinforced": 2, "low_usefulness": 1}
+    assert payload["items"][0]["rid"] == "rid-noisy"
+    assert payload["items"][0]["low_usefulness"] is True
+    assert payload["items"][0]["age_seconds"] == 300
+
+
+def test_hygiene_scan_and_apply_surface_v06_cleanup(monkeypatch):
+    class FakeEngine:
+        def __init__(self):
+            self.calls = []
+        def stats(self, namespace=None):
+            self.calls.append(("stats", namespace))
+            return {"active_memories": 3, "consolidated_memories": 1, "tombstoned_memories": 2}
+        def get_conflicts(self, namespace=None, status=None, limit=50):
+            self.calls.append(("conflicts", namespace, status, limit))
+            return [{"conflict_id": "c1", "priority": "high"}]
+        def think(self, config=None):
+            self.calls.append(("think", config))
+            return {"consolidated": 1}
+        def forget(self, rid):
+            self.calls.append(("forget", rid))
+            return rid == "rid-stale"
+
+    fake = FakeEngine()
+    monkeypatch.setattr(dashboard, "engine", lambda: fake)
+    monkeypatch.setattr(dashboard, "HTTP_BACKEND", None)
+    monkeypatch.setattr(dashboard, "ADMIN_MODE_ENV", True)
+    monkeypatch.setattr(dashboard, "recall_feedback_payload", lambda limit=25: {"items": [{"rid": "rid-stale", "low_usefulness": True}]})
+    client = TestClient(dashboard.app)
+
+    scan = client.get("/api/hygiene?namespace=ns:test").json()
+    assert scan["summary"]["open_conflicts"] == 1
+    assert scan["summary"]["low_usefulness"] == 1
+    assert scan["engine"]["active_memories"] == 3
+
+    applied = client.post("/api/hygiene", json={"namespace": "ns:test", "consolidate": True, "forget_rids": ["rid-stale", "rid-missing"]}).json()
+    assert applied["consolidation"] == {"consolidated": 1}
+    assert applied["forgotten"] == [{"rid": "rid-stale", "found": True}, {"rid": "rid-missing", "found": False}]
+    assert ("forget", "rid-stale") in fake.calls
+
+
+def test_hygiene_scan_all_namespaces_uses_sql_status_counts(tmp_path, monkeypatch):
+    import sqlite3
+    db_path = tmp_path / "yantrikdb.db"
+    with sqlite3.connect(db_path) as conn:
+        conn.execute("CREATE TABLE memories (rid TEXT PRIMARY KEY, consolidation_status TEXT, namespace TEXT, domain TEXT, source TEXT, type TEXT, created_at REAL)")
+        conn.executemany("INSERT INTO memories VALUES (?,?,?,?,?,?,?)", [
+            ("r1", "active", "ns:a", "general", "user", "semantic", 1),
+            ("r2", "active", "ns:b", "general", "user", "semantic", 2),
+            ("r3", "consolidated", "ns:b", "general", "user", "semantic", 3),
+            ("r4", "tombstoned", "ns:c", "general", "user", "semantic", 4),
+        ])
+        conn.execute("CREATE TABLE conflicts (id TEXT, conflict_id TEXT, status TEXT)")
+        conn.execute("INSERT INTO conflicts VALUES ('c1','c1','open')")
+    monkeypatch.setattr(dashboard, "DB_PATH", db_path)
+    monkeypatch.setattr(dashboard, "HTTP_BACKEND", None)
+    monkeypatch.setattr(dashboard, "recall_feedback_payload", lambda limit=50: {"items": [], "summary": {}})
+
+    scan = dashboard.hygiene_scan(namespace="__all__")
+
+    assert scan["summary"]["active_memories"] == 2
+    assert scan["summary"]["consolidated_memories"] == 1
+    assert scan["summary"]["tombstoned_memories"] == 1
+    assert scan["summary"]["open_conflicts"] == 1
+    assert scan["engine"]["scope"] == "all_namespaces_sql"
+
+
 def test_memories_all_namespaces_sql_filter(tmp_path, monkeypatch):
     db_path = tmp_path / "yantrikdb.db"
     import sqlite3
@@ -323,6 +438,17 @@ def test_index_has_memory_namespace_filter_and_maintenance_label():
     assert "memoryNamespaceFilter" in html
     assert "Maintenance" in html
     assert "think()</button>" not in html
+
+
+def test_index_and_javascript_expose_v06_hygiene_controls():
+    html = (Path(dashboard.STATIC_DIR) / "index.html").read_text()
+    js = (Path(dashboard.STATIC_DIR) / "app.js").read_text()
+    assert "selfTuningRecallToggle" in html
+    assert "surfaceHygieneToggle" in html
+    assert "recallFeedbackCards" in html
+    assert "/api/recall-feedback" in js
+    assert "/api/hygiene" in js
+    assert "runHygieneScan" in js
 
 
 def test_identity_scope_api_returns_config_and_unmapped_namespaces(tmp_path, monkeypatch):

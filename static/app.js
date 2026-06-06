@@ -141,9 +141,9 @@ async function init(){
   $('#reloadIdentityScope')?.addEventListener('click',()=>loadIdentityScope()); $('#saveIdentityScope')?.addEventListener('click',()=>saveIdentityScope());
   $('#identityForm')?.addEventListener('submit', addIdentityFromForm); $('#actorForm')?.addEventListener('submit', addActorFromForm);
   $('#spaceForm')?.addEventListener('submit', addSpaceFromForm); $('#conversationForm')?.addEventListener('submit', addConversationFromForm);
-  $('#runThink').onclick=runThink; $('#refreshHealth').onclick=loadHealthPanel; $('#adminModeToggle')?.addEventListener('change',()=>saveSettings());
+  $('#runThink').onclick=runThink; $('#runHygieneScan')?.addEventListener('click',runHygieneScan); $('#refreshHealth').onclick=loadHealthPanel; $('#adminModeToggle')?.addEventListener('change',()=>saveSettings());
   $('#saveMemoryScoping')?.addEventListener('click',()=>saveMemoryScopingSettings());
-  ['#ownerScopingToggle','#includeBaseRecallToggle','#includeActorRecallToggle','#topKSetting'].forEach(sel=>$(sel)?.addEventListener('change',()=>saveMemoryScopingSettings({silent:true})));
+  ['#ownerScopingToggle','#includeBaseRecallToggle','#includeActorRecallToggle','#topKSetting','#selfTuningRecallToggle','#selfTuningMaxBoost','#surfaceHygieneToggle','#hygieneMaxSurfaced'].forEach(sel=>$(sel)?.addEventListener('change',()=>saveMemoryScopingSettings({silent:true})));
   $('#savePassword')?.addEventListener('click',()=>saveSettings({password:true}));
   $('#disablePassword')?.addEventListener('click',()=>saveSettings({disablePassword:true}));
   $('#logoutBtn')?.addEventListener('click',logout);
@@ -479,6 +479,8 @@ function settingsRows(s){
     ['Backend mode', y.mode || 'embedded'],
     ['Base namespace', y.namespace || 'hermes'],
     ['Default scope', y.default_namespace || s.default_namespace],
+    ['Self-tuning recall', y.self_tuning_recall ? `Enabled · max +${y.self_tuning_max_boost}` : 'Disabled'],
+    ['Prompt hygiene surfacing', y.surface_hygiene ? `Enabled · ${fmt(y.hygiene_max_surfaced)} candidates` : 'Disabled'],
     ['Database', s.db_path],
     ['Provider config', y.config_path || ''],
     ['Provider map', y.identity_map_path || 'not set'],
@@ -494,6 +496,10 @@ async function loadSettings(){
   const baseToggle=$('#includeBaseRecallToggle'); if(baseToggle) baseToggle.checked=!!y.include_base_namespace_recall;
   const actorToggle=$('#includeActorRecallToggle'); if(actorToggle) actorToggle.checked=!!y.include_legacy_actor_namespace_recall;
   const topK=$('#topKSetting'); if(topK) topK.value=y.top_k||10;
+  const selfTuning=$('#selfTuningRecallToggle'); if(selfTuning) selfTuning.checked=!!y.self_tuning_recall;
+  const selfBoost=$('#selfTuningMaxBoost'); if(selfBoost) selfBoost.value=y.self_tuning_max_boost ?? 0.15;
+  const surfHygiene=$('#surfaceHygieneToggle'); if(surfHygiene) surfHygiene.checked=!!y.surface_hygiene;
+  const hygieneMax=$('#hygieneMaxSurfaced'); if(hygieneMax) hygieneMax.value=y.hygiene_max_surfaced || 5;
   const passwordState=$('#passwordState'); if(passwordState) passwordState.textContent=state.settings.password_enabled?'Password enabled. Changes clear saved browser sessions.':'Password disabled.';
   updateScopeUi();
   $('#settingsRuntime').innerHTML=settingsRows(state.settings);
@@ -506,6 +512,10 @@ async function saveMemoryScopingSettings(opts={}){
     include_base_namespace_recall:!!$('#includeBaseRecallToggle')?.checked,
     include_legacy_actor_namespace_recall:!!$('#includeActorRecallToggle')?.checked,
     top_k:Number($('#topKSetting')?.value || 10),
+    self_tuning_recall:!!$('#selfTuningRecallToggle')?.checked,
+    self_tuning_max_boost:Number($('#selfTuningMaxBoost')?.value || 0.15),
+    surface_hygiene:!!$('#surfaceHygieneToggle')?.checked,
+    hygiene_max_surfaced:Number($('#hygieneMaxSurfaced')?.value || 5),
   };
   try{
     state.settings=await api('/api/settings',{method:'POST',body:JSON.stringify(payload)});
@@ -826,7 +836,17 @@ async function loadLifecycle(){
   $('#triggerList').innerHTML=(triggers.items||[]).map(renderTrigger).join('')||'<div class="empty">No triggers.</div>';
 }
 async function runThink(){ if(!await confirmAction('Run maintenance pass?','This will run housekeeping on the selected memory scope. Admin Mode must be enabled.'))return; const btn=$('#runThink'); const oldText=btn?.textContent; try{ if(btn){btn.disabled=true;btn.textContent='Running…';} $('#opsDetails')?.setAttribute('open',''); $('#opsOutput').textContent='Running maintenance…'; const out=await api('/api/think',{method:'POST',body:JSON.stringify({run_consolidation:true,run_conflict_scan:true,run_pattern_mining:false,run_personality:false})}); $('#opsOutput').textContent=JSON.stringify(out,null,2); toast('Maintenance complete'); await loadStats(); }catch(e){$('#opsDetails')?.setAttribute('open',''); $('#opsOutput').textContent=e.message; toast(e.message);} finally{ if(btn){btn.disabled=false;btn.textContent=oldText||'Run pass';} } }
-async function loadHealthPanel(){ const h=await api('/api/health'); $('#healthPayload').textContent=JSON.stringify(h,null,2); }
+function renderHygieneCandidate(item){ return `<div class="memory-item"><div class="memory-title">${esc(item.rid||'memory')} <span class="pill warn">surfaced ${fmt(item.surfaced||0)}</span></div><div class="memory-text">Never reinforced in recall feedback${item.age_seconds!=null?` · last seen ${fmt(Math.round(item.age_seconds/60))}m ago`:''}</div><div class="toolbar compact"><button class="btn secondary" onclick="showSelectableCopy('RID','${esc(item.rid||'')}')">Copy RID</button></div></div>`; }
+function renderHygiene(h, fb){
+  const hs=h?.summary||{}; const fs=fb?.summary||{};
+  if($('#hygieneCards')) $('#hygieneCards').innerHTML=[['Open conflicts',hs.open_conflicts||0],['Low-usefulness',hs.low_usefulness||0],['Active',hs.active_memories||0],['Forgotten',hs.tombstoned_memories||0]].map(m=>`<div class="stat-card"><div class="stat-label">${m[0]}</div><div class="stat-value">${fmt(m[1])}</div></div>`).join('');
+  if($('#recallFeedbackCards')) $('#recallFeedbackCards').innerHTML=[['Tracked recall rids',fs.tracked||0],['Surfaced',fs.surfaced||0],['Reinforced',fs.reinforced||0],['Low signal',fs.low_usefulness||0]].map(m=>`<div class="stat-card"><div class="stat-label">${m[0]}</div><div class="stat-value">${fmt(m[1])}</div></div>`).join('');
+  const candidates=h?.low_usefulness_candidates||[];
+  if($('#hygieneList')) $('#hygieneList').innerHTML=candidates.map(renderHygieneCandidate).join('') || '<div class="empty helpful-empty"><strong>No v0.6 hygiene candidates.</strong><span>Self-tuning recall feedback has not marked any repeated, unrewarded memories yet.</span></div>';
+}
+async function loadHygienePanel(){ const [h,fb]=await Promise.all([api(`/api/hygiene?namespace=${encodeURIComponent(ns())}`),api('/api/recall-feedback?limit=25')]); renderHygiene(h,fb); return h; }
+async function runHygieneScan(){ const btn=$('#runHygieneScan'); const oldText=btn?.textContent; try{ if(btn){btn.disabled=true;btn.textContent='Scanning…';} const h=await loadHygienePanel(); $('#opsDetails')?.setAttribute('open',''); $('#opsOutput').textContent=JSON.stringify(h,null,2); toast('Hygiene scan complete'); }catch(e){ $('#opsDetails')?.setAttribute('open',''); $('#opsOutput').textContent=e.message; toast(e.message); } finally{ if(btn){btn.disabled=false;btn.textContent=oldText||'Scan';} } }
+async function loadHealthPanel(){ const [h]=await Promise.all([api('/api/health'), loadHygienePanel().catch(e=>({error:e.message}))]); $('#healthPayload').textContent=JSON.stringify(h,null,2); }
 
 
 // Direct Mnemosyne Three.js visualiser port. Keep this close to mnemosyne-dashboard/static/app.js.

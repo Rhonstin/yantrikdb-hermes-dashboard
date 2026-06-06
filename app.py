@@ -42,6 +42,7 @@ SETTINGS_PATH = Path(os.environ.get("YANTRIKDB_DASHBOARD_SETTINGS_PATH") or (LEG
 YANTRIKDB_CONFIG_PATH = Path(os.environ.get("YANTRIKDB_CONFIG_PATH") or (Path.home() / ".hermes" / "yantrikdb.json")).expanduser()
 YANTRIKDB_PLUGIN_DIR = Path(os.environ.get("YANTRIKDB_PLUGIN_DIR") or (Path.home() / ".hermes" / "plugins" / "yantrikdb")).expanduser()
 RECENT_SKILLS_PATH = Path(os.environ.get("YANTRIKDB_RECENT_SKILLS_PATH") or (Path.home() / ".hermes" / "yantrikdb-recent-skills.json")).expanduser()
+RECALL_FEEDBACK_PATH = Path(os.environ.get("YANTRIKDB_RECALL_FEEDBACK_PATH") or (Path.home() / ".hermes" / "yantrikdb-recall-feedback.json")).expanduser()
 WHATSAPP_SESSION_DIR = Path(os.environ.get("HERMES_WHATSAPP_SESSION_DIR") or (Path.home() / ".hermes" / "whatsapp" / "session")).expanduser()
 
 
@@ -424,6 +425,16 @@ class SettingsRequest(BaseModel):
     include_base_namespace_recall: Optional[bool] = None
     include_legacy_actor_namespace_recall: Optional[bool] = None
     top_k: Optional[int] = None
+    self_tuning_recall: Optional[bool] = None
+    self_tuning_max_boost: Optional[float] = None
+    surface_hygiene: Optional[bool] = None
+    hygiene_max_surfaced: Optional[int] = None
+
+
+class HygieneApplyRequest(BaseModel):
+    namespace: Optional[str] = None
+    consolidate: bool = False
+    forget_rids: list[str] = []
 
 
 class IdentityScopeRequest(BaseModel):
@@ -827,6 +838,10 @@ def yantrikdb_settings_payload() -> dict[str, Any]:
         "owner_scoping": bool_config(ycfg.get("owner_scoping"), False),
         "include_base_namespace_recall": bool_config(ycfg.get("include_base_namespace_recall"), True),
         "include_legacy_actor_namespace_recall": bool_config(ycfg.get("include_legacy_actor_namespace_recall"), True),
+        "self_tuning_recall": bool_config(ycfg.get("self_tuning_recall"), False),
+        "self_tuning_max_boost": float(ycfg.get("self_tuning_max_boost") or 0.15),
+        "surface_hygiene": bool_config(ycfg.get("surface_hygiene"), False),
+        "hygiene_max_surfaced": int(ycfg.get("hygiene_max_surfaced") or 5),
         "identity_map_path": str(Path(str(ycfg.get("identity_map_path") or "")).expanduser()) if ycfg.get("identity_map_path") else "",
     }
 
@@ -865,7 +880,17 @@ def update_settings(req: SettingsRequest, request: Request) -> Response:
         data["password_hash"] = digest
         data["session_secret"] = secrets.token_hex(32)
         clear_cookie = True
-    if any(v is not None for v in [req.owner_scoping, req.include_base_namespace_recall, req.include_legacy_actor_namespace_recall, req.top_k]):
+    runtime_updates = [
+        req.owner_scoping,
+        req.include_base_namespace_recall,
+        req.include_legacy_actor_namespace_recall,
+        req.top_k,
+        req.self_tuning_recall,
+        req.self_tuning_max_boost,
+        req.surface_hygiene,
+        req.hygiene_max_surfaced,
+    ]
+    if any(v is not None for v in runtime_updates):
         if not req.admin_mode:
             require_admin(request)
         ycfg = load_yantrikdb_runtime_config()
@@ -877,6 +902,14 @@ def update_settings(req: SettingsRequest, request: Request) -> Response:
             ycfg["include_legacy_actor_namespace_recall"] = bool(req.include_legacy_actor_namespace_recall)
         if req.top_k is not None:
             ycfg["top_k"] = max(1, min(50, int(req.top_k)))
+        if req.self_tuning_recall is not None:
+            ycfg["self_tuning_recall"] = bool(req.self_tuning_recall)
+        if req.self_tuning_max_boost is not None:
+            ycfg["self_tuning_max_boost"] = max(0.0, min(1.0, float(req.self_tuning_max_boost)))
+        if req.surface_hygiene is not None:
+            ycfg["surface_hygiene"] = bool(req.surface_hygiene)
+        if req.hygiene_max_surfaced is not None:
+            ycfg["hygiene_max_surfaced"] = max(1, min(50, int(req.hygiene_max_surfaced)))
         save_yantrikdb_runtime_config(ycfg)
     data["updated_at"] = now()
     save_dashboard_settings(data)
@@ -1195,6 +1228,119 @@ def run_think(req: ThinkRequest, request: Request) -> dict[str, Any]:
         return out if isinstance(out, dict) else {"ok": True, "result": out}
     except Exception as e:
         raise HTTPException(500, f"think failed: {e}")
+
+
+def recall_feedback_payload(limit: int = 50) -> dict[str, Any]:
+    raw: dict[str, Any] = {}
+    if RECALL_FEEDBACK_PATH.exists():
+        try:
+            loaded = json.loads(RECALL_FEEDBACK_PATH.read_text(encoding="utf-8"))
+            raw = loaded if isinstance(loaded, dict) else {}
+        except (OSError, json.JSONDecodeError):
+            raw = {}
+    items: list[dict[str, Any]] = []
+    total_surfaced = 0
+    total_reinforced = 0
+    for rid, meta in raw.items():
+        if not isinstance(meta, dict):
+            continue
+        surfaced = int(meta.get("surfaced") or 0)
+        reinforced = int(meta.get("reinforced") or 0)
+        last_ts = float(meta.get("last_ts") or 0)
+        total_surfaced += surfaced
+        total_reinforced += reinforced
+        low_usefulness = surfaced >= 3 and reinforced == 0
+        items.append({
+            "rid": str(rid),
+            "surfaced": surfaced,
+            "reinforced": reinforced,
+            "last_ts": last_ts,
+            "age_seconds": int(max(0, now() - last_ts)) if last_ts else None,
+            "low_usefulness": low_usefulness,
+            "reinforcement_rate": round(reinforced / surfaced, 3) if surfaced else 0.0,
+        })
+    items.sort(key=lambda x: (x["low_usefulness"], x["surfaced"], x["last_ts"]), reverse=True)
+    low_count = sum(1 for item in items if item["low_usefulness"])
+    return {
+        "path": str(RECALL_FEEDBACK_PATH),
+        "summary": {
+            "tracked": len(items),
+            "surfaced": total_surfaced,
+            "reinforced": total_reinforced,
+            "low_usefulness": low_count,
+        },
+        "items": items[: max(1, min(200, int(limit)))],
+    }
+
+
+@app.get("/api/recall-feedback")
+def recall_feedback(limit: int = Query(50, ge=1, le=200)) -> dict[str, Any]:
+    return recall_feedback_payload(limit=limit)
+
+
+@app.get("/api/hygiene")
+def hygiene_scan(namespace: str = Query(DEFAULT_NAMESPACE)) -> dict[str, Any]:
+    if HTTP_BACKEND is not None:
+        raise not_implemented_response("hygiene")
+    dashboard_stats: dict[str, Any] | None = None
+    if is_all_namespaces(namespace):
+        dashboard_stats = stats(namespace=namespace)
+        engine_stats = dashboard_stats.get("engine", {})
+    else:
+        try:
+            engine_stats = engine().stats(namespace=namespace)
+        except Exception as e:
+            engine_stats = {"error": str(e)}
+    try:
+        conflicts = safe_items(engine().get_conflicts(namespace=None if is_all_namespaces(namespace) else namespace, status="open", limit=50))
+    except Exception:
+        conflicts = []
+    feedback = recall_feedback_payload(limit=50)
+    low_usefulness = [item for item in feedback.get("items", []) if item.get("low_usefulness")]
+    open_conflict_count = int((dashboard_stats or {}).get("open_conflicts") or len(conflicts))
+    summary = {
+        "active_memories": int((engine_stats or {}).get("active_memories") or 0),
+        "consolidated_memories": int((engine_stats or {}).get("consolidated_memories") or 0),
+        "tombstoned_memories": int((engine_stats or {}).get("tombstoned_memories") or 0),
+        "open_conflicts": open_conflict_count,
+        "low_usefulness": len(low_usefulness),
+    }
+    return {
+        "namespace": namespace,
+        "summary": summary,
+        "engine": json_safe(engine_stats),
+        "open_conflicts": conflicts,
+        "low_usefulness_candidates": low_usefulness,
+        "feedback": feedback.get("summary", {}),
+        "recommended_actions": [
+            "Review open contradictions before resolving or forgetting memories." if conflicts else "No open contradictions surfaced.",
+            "Review low-usefulness candidates; forget only confirmed stale or wrong rids." if low_usefulness else "No low-usefulness recall candidates surfaced.",
+        ],
+    }
+
+
+@app.post("/api/hygiene")
+def hygiene_apply(req: HygieneApplyRequest, request: Request) -> dict[str, Any]:
+    if HTTP_BACKEND is not None:
+        raise not_implemented_response("hygiene")
+    require_admin(request)
+    namespace = req.namespace or DEFAULT_NAMESPACE
+    consolidation: dict[str, Any] | None = None
+    if req.consolidate:
+        try:
+            out = engine().think({"run_consolidation": True, "run_conflict_scan": True, "namespace": namespace})
+            consolidation = out if isinstance(out, dict) else {"ok": True, "result": json_safe(out)}
+        except Exception as e:
+            raise HTTPException(500, f"hygiene consolidation failed: {e}")
+    forgotten: list[dict[str, Any]] = []
+    for rid in req.forget_rids[:50]:
+        try:
+            found = bool(engine().forget(rid))
+        except Exception as e:
+            forgotten.append({"rid": rid, "found": False, "error": str(e)})
+            continue
+        forgotten.append({"rid": rid, "found": found})
+    return {"namespace": namespace, "consolidation": consolidation, "forgotten": forgotten}
 
 
 @app.post("/api/memory/{rid}/forget")
