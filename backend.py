@@ -76,6 +76,8 @@ class HTTPBackend:
         if resp.status_code == 204 or not resp.content:
             return {}
         ctype = resp.headers.get("Content-Type", "")
+        if "jsonl" in ctype or "ndjson" in ctype or ctype == "application/x-ndjson":
+            return resp.text
         if "json" in ctype:
             try:
                 return resp.json()
