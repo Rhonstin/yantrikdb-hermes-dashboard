@@ -282,12 +282,20 @@ class HTTPBackend:
         return self._request("POST", "/v1/skills/search", json=payload)
 
     def skill_outcomes(self, skill_id: str, limit: int = 25) -> dict[str, Any]:
-        body = self._request("GET", f"/v1/skills/{skill_id}/outcome",
-                             params={"limit": limit})
-        if isinstance(body, dict) and "items" not in body:
-            # Server may return raw rows; wrap in the dashboard's shape.
-            return {"items": body.get("outcomes") or body.get("results") or [], "total": len(body.get("outcomes") or body.get("results") or []), "skill_id": skill_id}
-        return body
+        # Outcomes live in the outcome_substrate namespace as memories with
+        # text "Outcome for <skill_id>: success=...". The server's GET
+        # /v1/skills/{id}/outcome returns 200-empty on this build, so fall
+        # back to listing outcome_substrate memories and filtering locally.
+        body = self._request("GET", "/v1/memories",
+                             params={"namespace": "outcome_substrate", "limit": min(limit, 200), "sort": "created_at"})
+        items_raw = body.get("items") or []
+        needle = f"outcome for {skill_id.lower()}"
+        items = [i for i in items_raw if needle in str(i.get("text") or "").lower()]
+        successes = 0
+        for i in items:
+            if str(i.get("text") or "").lower().startswith(f"outcome for {skill_id.lower()}: success=true"):
+                successes += 1
+        return {"items": items, "total": len(items), "successes": successes, "failures": len(items) - successes, "skill_id": skill_id}
 
 
 class HTTPBackendSkillSearch:
