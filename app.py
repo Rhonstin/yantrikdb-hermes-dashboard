@@ -34,8 +34,8 @@ APP_DIR = Path(__file__).resolve().parent
 STATIC_DIR = APP_DIR / "static"
 DEFAULT_DB = Path.home() / ".hermes" / "yantrikdb-memory.db"
 DB_PATH = Path(os.environ.get("YANTRIKDB_DB_PATH") or DEFAULT_DB).expanduser()
-BASE_NAMESPACE = os.environ.get("YANTRIKDB_NAMESPACE", "hermes")
-DEFAULT_NAMESPACE = os.environ.get("YANTRIKDB_DASHBOARD_NAMESPACE", f"{BASE_NAMESPACE}:hermes:default")
+BASE_NAMESPACE = os.environ.get("YANTRIKDB_NAMESPACE", "wiki")
+DEFAULT_NAMESPACE = os.environ.get("YANTRIKDB_DASHBOARD_NAMESPACE", "wiki")
 DEFAULT_SETTINGS_PATH = Path.home() / ".hermes" / "plugin-data" / "yantrikdb-hermes-dashboard" / "settings.json"
 LEGACY_SETTINGS_PATH = Path.home() / ".hermes" / "plugin-data" / "yantrikdb-dashboard" / "settings.json"
 SETTINGS_PATH = Path(os.environ.get("YANTRIKDB_DASHBOARD_SETTINGS_PATH") or (LEGACY_SETTINGS_PATH if LEGACY_SETTINGS_PATH.exists() and not DEFAULT_SETTINGS_PATH.exists() else DEFAULT_SETTINGS_PATH)).expanduser()
@@ -59,7 +59,7 @@ ADMIN_MODE_ENV = env_bool("YANTRIKDB_DASHBOARD_ADMIN_MODE", False)
 # dashboard proxies supported routes to that yantrikdb-server v0.8.17+
 # cluster instead of reading the embedded SQLite store. When unset,
 # behaviour is unchanged: routes read SQLite directly as before.
-from backend import HTTPBackend, NotImplementedHTTPBackend, make_backend, not_implemented_response  # noqa: E402
+from backend import HTTPBackend, HTTPBackendSkillSearch, NotImplementedHTTPBackend, make_backend, not_implemented_response  # noqa: E402
 
 HTTP_BACKEND: HTTPBackend | None = make_backend()
 
@@ -356,9 +356,16 @@ def yantrikdb_skill_tool_names() -> list[str]:
 
 
 def skill_backend():
-    import yantrikdb_hermes_plugin as plugin
-    cfg = load_yantrikdb_plugin_config()
-    return plugin.make_backend(cfg)
+    # Rhonstin fork: in HTTP mode, skill search proxies to the server's
+    # /v1/skills/search; the Hermes plugin backend is not required.
+    if HTTP_BACKEND is not None:
+        return HTTPBackendSkillSearch(HTTP_BACKEND)
+    try:
+        import yantrikdb_hermes_plugin as plugin
+        cfg = load_yantrikdb_plugin_config()
+        return plugin.make_backend(cfg)
+    except ImportError:
+        return HTTPBackendSkillSearch(HTTP_BACKEND) if HTTP_BACKEND is not None else None
 
 
 def normalize_skill_hit(hit: dict[str, Any]) -> dict[str, Any]:
@@ -788,7 +795,10 @@ def identity_scope_payload() -> dict[str, Any]:
 @app.get("/api/identity-scope")
 def get_identity_scope() -> dict[str, Any]:
     if HTTP_BACKEND is not None:
-        raise not_implemented_response("identity-scope")
+        try:
+            return HTTP_BACKEND.identity_scope()
+        except NotImplementedHTTPBackend:
+            return identity_scope_payload()
     return identity_scope_payload()
 
 
@@ -1125,7 +1135,25 @@ def sql_recall_fallback(query: str, namespace: str, limit: int, domain: str | No
 @app.post("/api/recall")
 def recall(req: RecallRequest) -> dict[str, Any]:
     if HTTP_BACKEND is not None:
-        raise not_implemented_response("recall")
+        namespace = req.namespace or DEFAULT_NAMESPACE
+        top_k = max(1, min(req.top_k, 50))
+        if is_all_namespaces(namespace):
+            return {
+                "results": [],
+                "fallback": "http_all_namespaces",
+                "namespace": "__all__",
+                "certainty_reasons": ["HTTP mode recall is namespace-scoped; pick a namespace."],
+            }
+        data = HTTP_BACKEND.recall(
+            query=req.query,
+            top_k=top_k,
+            namespace=namespace,
+            domain=req.domain or None,
+            source=req.source or None,
+            include_consolidated=req.include_consolidated,
+            expand_entities=req.expand_entities,
+        )
+        return data if isinstance(data, dict) else {"results": list(data) if data else []}
     if not req.query.strip():
         raise HTTPException(400, "query required")
     namespace = req.namespace or DEFAULT_NAMESPACE
@@ -1175,7 +1203,7 @@ def recall(req: RecallRequest) -> dict[str, Any]:
 @app.get("/api/conflicts")
 def conflicts(namespace: str = Query(DEFAULT_NAMESPACE), status: str = "", limit: int = Query(50, le=200)) -> dict[str, Any]:
     if HTTP_BACKEND is not None:
-        raise not_implemented_response("conflicts")
+        return HTTP_BACKEND.conflicts(namespace=namespace if not is_all_namespaces(namespace) else "", status=status, limit=limit)
     try:
         items = engine().get_conflicts(namespace=namespace, status=status or None, limit=limit)
         return {"items": list(items) if items else []}
@@ -1194,7 +1222,7 @@ def conflicts(namespace: str = Query(DEFAULT_NAMESPACE), status: str = "", limit
 @app.get("/api/conflicts/{conflict_id}")
 def conflict_detail(conflict_id: str) -> dict[str, Any]:
     if HTTP_BACKEND is not None:
-        raise not_implemented_response("conflict_detail")
+        return HTTP_BACKEND.conflict_detail(conflict_id)
     try:
         c = engine().get_conflict(conflict_id)
         return c if isinstance(c, dict) else {"conflict": c}
@@ -1208,7 +1236,8 @@ def conflict_detail(conflict_id: str) -> dict[str, Any]:
 @app.post("/api/conflicts/{conflict_id}/resolve")
 def resolve_conflict(conflict_id: str, req: ResolveRequest, request: Request) -> dict[str, Any]:
     if HTTP_BACKEND is not None:
-        raise not_implemented_response("conflict_resolve")
+        require_admin(request)
+        return HTTP_BACKEND.resolve_conflict(conflict_id, req.strategy, winner_rid=req.winner_rid, new_text=req.new_text, resolution_note=req.resolution_note)
     require_admin(request)
     try:
         out = engine().resolve_conflict(conflict_id, req.strategy, winner_rid=req.winner_rid, new_text=req.new_text, resolution_note=req.resolution_note)
@@ -1220,7 +1249,9 @@ def resolve_conflict(conflict_id: str, req: ResolveRequest, request: Request) ->
 @app.post("/api/think")
 def run_think(req: ThinkRequest, request: Request) -> dict[str, Any]:
     if HTTP_BACKEND is not None:
-        raise not_implemented_response("think")
+        require_admin(request)
+        cfg = req.model_dump(exclude_none=True)
+        return HTTP_BACKEND.think(**cfg)
     require_admin(request)
     cfg = req.model_dump(exclude_none=True)
     try:
@@ -1346,7 +1377,8 @@ def hygiene_apply(req: HygieneApplyRequest, request: Request) -> dict[str, Any]:
 @app.post("/api/memory/{rid}/forget")
 def forget_memory(rid: str, request: Request) -> dict[str, Any]:
     if HTTP_BACKEND is not None:
-        raise not_implemented_response("forget")
+        require_admin(request)
+        return HTTP_BACKEND.forget(rid, namespace=DEFAULT_NAMESPACE)
     require_admin(request)
     try:
         found = bool(engine().forget(rid))
@@ -1433,7 +1465,16 @@ def constellation(namespace: str = Query(DEFAULT_NAMESPACE), limit: int = Query(
     extraction. No external calls, no DB mutation.
     """
     if HTTP_BACKEND is not None:
-        raise not_implemented_response("constellation")
+        memory_limit = min(limit, 320 if is_all_namespaces(namespace) else 180)
+        raw_memories = HTTP_BACKEND.list_memories(
+            namespace=namespace if not is_all_namespaces(namespace) else "",
+            status="active",
+            limit=memory_limit,
+            offset=0,
+            sort="importance",
+        ).get("items") or []
+        memories = [clean_row(m) for m in raw_memories[:memory_limit]]
+        return _build_constellation(memories, namespace, limit, is_all_namespaces(namespace))
     clauses, params = namespace_clause("namespace", namespace)
     clauses.append("consolidation_status IN ('active','consolidated')")
     where_sql = " AND ".join(clauses)
@@ -1476,7 +1517,15 @@ def constellation(namespace: str = Query(DEFAULT_NAMESPACE), limit: int = Query(
             """,
             (*params, memory_limit),
         )]
-    all_scope = is_all_namespaces(namespace)
+    return _build_constellation(memories, namespace, limit, is_all_namespaces(namespace))
+
+
+def _build_constellation(
+    memories: list[dict[str, Any]],
+    namespace: str,
+    limit: int,
+    all_scope: bool,
+) -> dict[str, Any]:
     nodes_by_key: dict[str, dict[str, Any]] = {}
     edges: list[dict[str, Any]] = []
 
@@ -1598,6 +1647,8 @@ def constellation(namespace: str = Query(DEFAULT_NAMESPACE), limit: int = Query(
 
 @app.get("/api/entities")
 def entities(q: str = "", limit: int = Query(50, le=200)) -> dict[str, Any]:
+    if HTTP_BACKEND is not None:
+        return HTTP_BACKEND.entities(q=q, limit=limit)
     if not table_exists("entities"):
         return {"items": []}
     if q:
@@ -1610,7 +1661,17 @@ def entities(q: str = "", limit: int = Query(50, le=200)) -> dict[str, Any]:
 @app.get("/api/graph/{entity}")
 def graph(entity: str, namespace: str = Query(DEFAULT_NAMESPACE)) -> dict[str, Any]:
     if HTTP_BACKEND is not None:
-        raise not_implemented_response("graph")
+        body = HTTP_BACKEND.graph(entity, namespace=namespace if not is_all_namespaces(namespace) else "")
+        nodes: dict[str, dict[str, Any]] = {}
+        edges: list[dict[str, Any]] = []
+        for r in body.get("edges") or []:
+            d = r if isinstance(r, dict) else {"raw": str(r)}
+            src = d.get("src") or d.get("source") or entity
+            dst = d.get("dst") or d.get("target") or d.get("entity") or "unknown"
+            nodes.setdefault(src, {"id": src, "label": src})
+            nodes.setdefault(dst, {"id": dst, "label": dst})
+            edges.append({"source": src, "target": dst, "type": d.get("rel_type") or d.get("relationship") or d.get("type", "related"), "weight": d.get("weight", 1)})
+        return {"entity": entity, "nodes": list(nodes.values()), "edges": edges, "memories": []}
     nodes: dict[str, dict[str, Any]] = {}
     edges: list[dict[str, Any]] = []
     try:
@@ -1643,6 +1704,8 @@ def graph(entity: str, namespace: str = Query(DEFAULT_NAMESPACE)) -> dict[str, A
 
 @app.get("/api/patterns")
 def patterns(limit: int = Query(50, le=200)) -> dict[str, Any]:
+    if HTTP_BACKEND is not None:
+        return HTTP_BACKEND.patterns(limit=limit)
     if not table_exists("patterns"):
         return {"items": []}
     return {"items": rows("SELECT * FROM patterns ORDER BY confidence DESC, created_at DESC LIMIT ?", (limit,))}
@@ -1651,7 +1714,7 @@ def patterns(limit: int = Query(50, le=200)) -> dict[str, Any]:
 @app.get("/api/triggers")
 def triggers(limit: int = Query(50, le=200), status: str = "") -> dict[str, Any]:
     if HTTP_BACKEND is not None:
-        raise not_implemented_response("triggers")
+        return HTTP_BACKEND.triggers(limit=limit, status=status)
     try:
         if not status or status == "pending":
             if hasattr(engine(), "pending_triggers"):
@@ -1676,7 +1739,8 @@ def triggers(limit: int = Query(50, le=200), status: str = "") -> dict[str, Any]
 @app.post("/api/triggers/{trigger_id}/acknowledge")
 def acknowledge_trigger(trigger_id: str, request: Request) -> dict[str, Any]:
     if HTTP_BACKEND is not None:
-        raise not_implemented_response("trigger_acknowledge")
+        require_admin(request)
+        return HTTP_BACKEND.trigger_acknowledge(trigger_id)
     require_admin(request)
     try:
         out = engine().acknowledge_trigger(trigger_id)
@@ -1688,7 +1752,8 @@ def acknowledge_trigger(trigger_id: str, request: Request) -> dict[str, Any]:
 @app.post("/api/triggers/{trigger_id}/dismiss")
 def dismiss_trigger(trigger_id: str, request: Request) -> dict[str, Any]:
     if HTTP_BACKEND is not None:
-        raise not_implemented_response("trigger_dismiss")
+        require_admin(request)
+        return HTTP_BACKEND.trigger_dismiss(trigger_id)
     require_admin(request)
     try:
         out = engine().dismiss_trigger(trigger_id)
@@ -1700,7 +1765,8 @@ def dismiss_trigger(trigger_id: str, request: Request) -> dict[str, Any]:
 @app.post("/api/triggers/{trigger_id}/act")
 def act_on_trigger(trigger_id: str, request: Request) -> dict[str, Any]:
     if HTTP_BACKEND is not None:
-        raise not_implemented_response("trigger_act")
+        require_admin(request)
+        return HTTP_BACKEND.trigger_act(trigger_id)
     require_admin(request)
     try:
         out = engine().act_on_trigger(trigger_id)
@@ -1734,6 +1800,31 @@ def recent_skills(limit: int = Query(10, le=50)) -> dict[str, Any]:
 
 @app.get("/api/skill-recall/status")
 def skill_recall_status() -> dict[str, Any]:
+    if HTTP_BACKEND is not None:
+        recent_count = 0
+        if RECENT_SKILLS_PATH.exists():
+            recent_raw = parse_json(RECENT_SKILLS_PATH.read_text(), []) or []
+            recent_count = len(recent_raw) if isinstance(recent_raw, list) else 0
+        return {
+            "installed": True,
+            "mode": "http",
+            "db_path": None,
+            "namespace": BASE_NAMESPACE,
+            "skills_enabled": True,
+            "skill_tools_exposed": True,
+            "tool_names": [],
+            "available_tool_names": [],
+            "auto_skill_attach": False,
+            "auto_skill_min_score": None,
+            "auto_skill_max_bodies": None,
+            "surface_recent_skills": bool(env_bool("YANTRIKDB_SURFACE_RECENT_SKILLS", True)),
+            "top_k": None,
+            "recent_skills_path": str(RECENT_SKILLS_PATH),
+            "recent_skills_count": recent_count,
+            "skill_namespace": "skill_substrate",
+            "outcome_namespace": "outcome_substrate",
+            "warning": None,
+        }
     try:
         cfg = load_yantrikdb_plugin_config()
         tool_names = yantrikdb_skill_tool_names()
@@ -1785,7 +1876,7 @@ def skill_recall_search(req: SkillSearchRequest) -> dict[str, Any]:
 @app.get("/api/skill-recall/{skill_id}/outcomes")
 def skill_recall_outcomes(skill_id: str, limit: int = Query(25, le=100)) -> dict[str, Any]:
     if HTTP_BACKEND is not None:
-        raise not_implemented_response("skill_outcomes")
+        return HTTP_BACKEND.skill_outcomes(skill_id, limit=limit)
     if not table_exists("memories"):
         return {"items": [], "total": 0, "skill_id": skill_id}
     try:
@@ -1817,6 +1908,8 @@ def skill_recall_outcomes(skill_id: str, limit: int = Query(25, le=100)) -> dict
 
 @app.get("/api/sessions")
 def sessions(namespace: str = Query(DEFAULT_NAMESPACE), limit: int = Query(50, le=200)) -> dict[str, Any]:
+    if HTTP_BACKEND is not None:
+        return HTTP_BACKEND.sessions(namespace=namespace if not is_all_namespaces(namespace) else "", limit=limit)
     if not table_exists("sessions"):
         return {"items": []}
     cols = [r["name"] for r in rows("PRAGMA table_info(sessions)")]
@@ -1828,7 +1921,7 @@ def sessions(namespace: str = Query(DEFAULT_NAMESPACE), limit: int = Query(50, l
 @app.get("/api/stale")
 def stale(namespace: str = Query(DEFAULT_NAMESPACE), days: float = 30.0, limit: int = Query(50, le=200)) -> dict[str, Any]:
     if HTTP_BACKEND is not None:
-        raise not_implemented_response("stale")
+        return HTTP_BACKEND.stale(namespace=namespace if not is_all_namespaces(namespace) else "", days=days, limit=limit)
     try:
         items = engine().stale(days=days, limit=limit, namespace=namespace)
         return {"items": list(items) if items else []}
@@ -1840,7 +1933,7 @@ def stale(namespace: str = Query(DEFAULT_NAMESPACE), days: float = 30.0, limit: 
 @app.get("/api/upcoming")
 def upcoming(namespace: str = Query(DEFAULT_NAMESPACE), days: float = 7.0, limit: int = Query(50, le=200)) -> dict[str, Any]:
     if HTTP_BACKEND is not None:
-        raise not_implemented_response("upcoming")
+        return HTTP_BACKEND.upcoming(namespace=namespace if not is_all_namespaces(namespace) else "", days=days, limit=limit)
     try:
         items = engine().upcoming(days=days, limit=limit, namespace=namespace)
         return {"items": list(items) if items else []}
@@ -1852,7 +1945,14 @@ def upcoming(namespace: str = Query(DEFAULT_NAMESPACE), days: float = 7.0, limit
 @app.get("/api/export/memories.jsonl")
 def export_memories(namespace: str = Query(DEFAULT_NAMESPACE), status: str = "active") -> StreamingResponse:
     if HTTP_BACKEND is not None:
-        raise not_implemented_response("export")
+        def generate_http():
+            raw = HTTP_BACKEND.export_memories(
+                namespace=namespace if not is_all_namespaces(namespace) else "",
+                limit=100000,
+                offset=0,
+            )
+            yield raw
+        return StreamingResponse(generate_http(), media_type="application/x-ndjson", headers={"Content-Disposition": "attachment; filename=yantrikdb-memories.jsonl"})
     def generate():
         offset = 0
         while True:
