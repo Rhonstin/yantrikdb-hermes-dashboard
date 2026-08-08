@@ -1866,7 +1866,7 @@ def skill_recall_search(req: SkillSearchRequest) -> dict[str, Any]:
         resp = skill_backend().skill_search(req.query, top_k=req.top_k, applies_to=req.applies_to)
     except Exception as e:
         raise HTTPException(500, f"skill search failed: {e}")
-    items = [normalize_skill_hit(x) for x in (resp.get("skills") or resp.get("items") or [])]
+    items = [normalize_skill_hit(x) for x in (resp.get("skills") or resp.get("items") or resp.get("results") or [])]
     min_score = req.min_score
     if min_score is not None:
         items = [x for x in items if x.get("score") is None or float(x.get("score") or 0) >= min_score]
